@@ -1,0 +1,152 @@
+#include "gradingwidget.h"
+#include "networkmanager.h"
+#include <QDoubleSpinBox>
+#include <QGroupBox>
+#include <QHBoxLayout>
+#include <QHeaderView>
+#include <QLabel>
+#include <QMessageBox>
+#include <QPushButton>
+#include <QTableWidget>
+#include <QVBoxLayout>
+
+GradingWidget::GradingWidget(QWidget *parent)
+    : QWidget(parent)
+{
+    setupUi();
+    onRefreshPendingAttempts();
+}
+
+void GradingWidget::setupUi()
+{
+    auto *mainLayout = new QVBoxLayout(this);
+
+    // Header
+    auto *headerLayout = new QHBoxLayout();
+    auto *titleLabel = new QLabel("Quiz Grading", this);
+    QFont font = titleLabel->font();
+    font.setPointSize(14);
+    font.setBold(true);
+    titleLabel->setFont(font);
+    headerLayout->addWidget(titleLabel);
+    headerLayout->addStretch();
+
+    m_refreshButton = new QPushButton("Refresh", this);
+    headerLayout->addWidget(m_refreshButton);
+
+    mainLayout->addLayout(headerLayout);
+
+    // Pending attempts table
+    mainLayout->addWidget(new QLabel("Pending Manual Grading:", this));
+
+    m_attemptsTable = new QTableWidget(this);
+    m_attemptsTable->setColumnCount(5);
+    m_attemptsTable->setHorizontalHeaderLabels(
+        QStringList() << "Attempt ID" << "Student" << "Quiz Title" << "Attempt #" << "Status");
+    m_attemptsTable->setSelectionBehavior(QAbstractItemView::SelectRows);
+    m_attemptsTable->setAlternatingRowColors(true);
+    m_attemptsTable->horizontalHeader()->setStretchLastSection(true);
+    mainLayout->addWidget(m_attemptsTable);
+
+    // Grading controls
+    auto *gradingGroup = new QGroupBox("Submit Grade", this);
+    auto *gradingLayout = new QHBoxLayout(gradingGroup);
+
+    gradingLayout->addWidget(new QLabel("Score:", this));
+
+    m_scoreSpinBox = new QDoubleSpinBox(this);
+    m_scoreSpinBox->setRange(0.0, 100.0);
+    m_scoreSpinBox->setSuffix("%");
+    m_scoreSpinBox->setDecimals(2);
+    gradingLayout->addWidget(m_scoreSpinBox);
+
+    m_submitGradeButton = new QPushButton("Submit Grade", this);
+    m_submitGradeButton->setEnabled(false);
+    gradingLayout->addWidget(m_submitGradeButton);
+
+    gradingLayout->addStretch();
+
+    mainLayout->addWidget(gradingGroup);
+    mainLayout->addStretch();
+
+    // Connect signals
+    connect(m_refreshButton, &QPushButton::clicked, this, &GradingWidget::onRefreshPendingAttempts);
+    connect(m_submitGradeButton, &QPushButton::clicked, this, &GradingWidget::onSubmitGrade);
+    connect(m_attemptsTable, &QTableWidget::itemSelectionChanged, this, [this]() {
+        m_submitGradeButton->setEnabled(m_attemptsTable->currentRow() >= 0);
+    });
+}
+
+void GradingWidget::onRefreshPendingAttempts()
+{
+    NetworkManager::instance().sendCommand("GET_PENDING_ATTEMPTS",
+                                           QJsonObject(),
+                                           [this](const QJsonObject &response) {
+                                               handlePendingAttemptsResponse(response);
+                                           });
+}
+
+void GradingWidget::onSubmitGrade()
+{
+    int row = m_attemptsTable->currentRow();
+    if (row < 0)
+        return;
+
+    int attemptId = m_attemptsTable->item(row, 0)->text().toInt();
+    QString studentName = m_attemptsTable->item(row, 1)->text();
+
+    int ret = QMessageBox::question(this,
+                                    "Submit Grade",
+                                    QString("Submit grade of %.2f%% for %1?")
+                                        .arg(m_scoreSpinBox->value())
+                                        .arg(studentName),
+                                    QMessageBox::Yes | QMessageBox::No);
+
+    if (ret == QMessageBox::Yes) {
+        QJsonObject data;
+        data["attempt_id"] = attemptId;
+        data["score"] = m_scoreSpinBox->value();
+
+        NetworkManager::instance()
+            .sendCommand("SUBMIT_GRADE", data, [this](const QJsonObject &response) {
+                if (response["type"].toString() == "OK") {
+                    QMessageBox::information(this, "Success", "Grade submitted successfully");
+                    onRefreshPendingAttempts();
+                } else {
+                    QMessageBox::critical(this, "Error", response["message"].toString());
+                }
+            });
+    }
+}
+
+void GradingWidget::handlePendingAttemptsResponse(const QJsonObject &response)
+{
+    if (response["type"].toString() == "DATA_RESPONSE") {
+        populateAttemptsTable(response["data"].toArray());
+    } else {
+        QMessageBox::critical(this, "Error", "Failed to fetch pending attempts");
+    }
+}
+
+void GradingWidget::populateAttemptsTable(const QJsonArray &attempts)
+{
+    m_attemptsTable->setRowCount(0);
+
+    for (const QJsonValue &value : attempts) {
+        QJsonObject attempt = value.toObject();
+        int row = m_attemptsTable->rowCount();
+        m_attemptsTable->insertRow(row);
+
+        m_attemptsTable
+            ->setItem(row, 0, new QTableWidgetItem(QString::number(attempt["attempt_id"].toInt())));
+        m_attemptsTable->setItem(row, 1, new QTableWidgetItem(attempt["student_name"].toString()));
+        m_attemptsTable->setItem(row, 2, new QTableWidgetItem(attempt["quiz_title"].toString()));
+        m_attemptsTable->setItem(row,
+                                 3,
+                                 new QTableWidgetItem(
+                                     QString::number(attempt["attempt_number"].toInt())));
+        m_attemptsTable->setItem(row, 4, new QTableWidgetItem("Pending"));
+    }
+
+    m_attemptsTable->resizeColumnsToContents();
+}
