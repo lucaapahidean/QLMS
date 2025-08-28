@@ -6,6 +6,7 @@
 #include <QSslServer>
 
 class ClientHandler;
+class QSslSocket;
 
 class Server : public QObject
 {
@@ -22,6 +23,9 @@ private slots:
     void onNewConnection();
     void onClientDisconnected(ClientHandler *handler);
     void onLogMessage(const QString &message);
+
+private:
+    void handleEncryptedSocket(QSslSocket *socket);
 
 private:
     QSslServer *m_tcpServer;

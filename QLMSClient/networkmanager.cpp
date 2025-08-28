@@ -1,6 +1,7 @@
 #include "networkmanager.h"
 #include <QDebug>
 #include <QJsonDocument>
+#include <QSslConfiguration>
 
 NetworkManager &NetworkManager::instance()
 {
@@ -11,9 +12,14 @@ NetworkManager &NetworkManager::instance()
 NetworkManager::NetworkManager()
     : m_socket(new QSslSocket(this))
 {
-    m_socket->setPeerVerifyMode(QSslSocket::VerifyNone);
+    // Configure SSL settings before any connection
+    QSslConfiguration sslConfig = m_socket->sslConfiguration();
+    sslConfig.setPeerVerifyMode(QSslSocket::VerifyNone); // Accept self-signed certificates
+    sslConfig.setProtocol(QSsl::TlsV1_2OrLater);
+    m_socket->setSslConfiguration(sslConfig);
 
     connect(m_socket, &QSslSocket::connected, this, &NetworkManager::onConnected);
+    connect(m_socket, &QSslSocket::encrypted, this, &NetworkManager::onEncrypted);
     connect(m_socket, &QSslSocket::disconnected, this, &NetworkManager::onDisconnected);
     connect(m_socket, &QSslSocket::readyRead, this, &NetworkManager::onReadyRead);
     connect(m_socket, &QSslSocket::sslErrors, this, &NetworkManager::onSslErrors);
@@ -31,17 +37,44 @@ NetworkManager::~NetworkManager()
 bool NetworkManager::connectToServer(const QString &host, quint16 port)
 {
     if (m_socket->state() != QAbstractSocket::UnconnectedState) {
+        qWarning() << "Socket is already connected or connecting";
         return false;
     }
 
+    qDebug() << "Attempting to connect to" << host << ":" << port;
+
+    // Clear any previous errors
+    m_buffer.clear();
+
+    // Start encrypted connection
     m_socket->connectToHostEncrypted(host, port);
-    return m_socket->waitForEncrypted(5000);
+
+    // Wait for the connection with a longer timeout for SSL handshake
+    if (!m_socket->waitForConnected(5000)) {
+        qWarning() << "Connection timeout or error:" << m_socket->errorString();
+        return false;
+    }
+
+    qDebug() << "TCP connection established, waiting for SSL handshake...";
+
+    // Wait for encryption
+    if (!m_socket->waitForEncrypted(10000)) { // Increased timeout for SSL
+        qWarning() << "SSL handshake failed:" << m_socket->errorString();
+        m_socket->disconnectFromHost();
+        return false;
+    }
+
+    qDebug() << "SSL handshake completed successfully";
+    return true;
 }
 
 void NetworkManager::disconnectFromServer()
 {
     if (m_socket->state() != QAbstractSocket::UnconnectedState) {
         m_socket->disconnectFromHost();
+        if (m_socket->state() != QAbstractSocket::UnconnectedState) {
+            m_socket->waitForDisconnected(5000);
+        }
     }
     m_buffer.clear();
     while (!m_callbacks.isEmpty()) {
@@ -51,13 +84,24 @@ void NetworkManager::disconnectFromServer()
 
 bool NetworkManager::isConnected() const
 {
-    return m_socket->state() == QAbstractSocket::ConnectedState;
+    return m_socket->state() == QAbstractSocket::ConnectedState && m_socket->isEncrypted();
 }
 
 void NetworkManager::sendCommand(const QString &command,
                                  const QJsonObject &data,
                                  std::function<void(const QJsonObject &)> callback)
 {
+    if (!isConnected()) {
+        qWarning() << "Cannot send command: not connected or not encrypted";
+        if (callback) {
+            QJsonObject error;
+            error["type"] = "ERROR";
+            error["message"] = "Not connected to server";
+            callback(error);
+        }
+        return;
+    }
+
     QJsonObject message;
     message["command"] = command;
     message["data"] = data;
@@ -71,13 +115,20 @@ void NetworkManager::sendCommand(const QString &command,
 
 void NetworkManager::onConnected()
 {
-    qDebug() << "Connected to server";
+    qDebug() << "TCP connection established";
+    // Don't emit connected yet - wait for encryption
+}
+
+void NetworkManager::onEncrypted()
+{
+    qDebug() << "SSL connection encrypted";
     emit connected();
 }
 
 void NetworkManager::onDisconnected()
 {
     qDebug() << "Disconnected from server";
+    m_buffer.clear();
     emit disconnected();
 }
 
@@ -93,14 +144,17 @@ void NetworkManager::onReadyRead()
         QJsonDocument doc = QJsonDocument::fromJson(messageData);
         if (!doc.isNull() && doc.isObject()) {
             processMessage(doc.object());
+        } else {
+            qWarning() << "Received invalid JSON message:" << messageData;
         }
     }
 }
 
 void NetworkManager::onSslErrors(const QList<QSslError> &errors)
 {
+    qWarning() << "SSL Errors occurred:";
     for (const QSslError &error : errors) {
-        qWarning() << "SSL Error:" << error.errorString();
+        qWarning() << "  -" << error.errorString();
     }
     // Accept self-signed certificates for development
     m_socket->ignoreSslErrors();
@@ -109,12 +163,37 @@ void NetworkManager::onSslErrors(const QList<QSslError> &errors)
 void NetworkManager::onSocketError(QAbstractSocket::SocketError error)
 {
     QString errorString = m_socket->errorString();
-    qCritical() << "Socket error:" << error << errorString;
-    emit errorOccurred(errorString);
+    qCritical() << "Socket error:" << error << "-" << errorString;
+
+    // Provide more specific error messages
+    QString userMessage;
+    switch (error) {
+    case QAbstractSocket::ConnectionRefusedError:
+        userMessage = "Connection refused. Is the server running?";
+        break;
+    case QAbstractSocket::RemoteHostClosedError:
+        userMessage = "Server closed the connection";
+        break;
+    case QAbstractSocket::HostNotFoundError:
+        userMessage = "Server host not found";
+        break;
+    case QAbstractSocket::SocketTimeoutError:
+        userMessage = "Connection timed out";
+        break;
+    case QAbstractSocket::SslHandshakeFailedError:
+        userMessage = "SSL handshake failed. Certificate issue?";
+        break;
+    default:
+        userMessage = errorString;
+    }
+
+    emit errorOccurred(userMessage);
 }
 
 void NetworkManager::processMessage(const QJsonObject &message)
 {
+    qDebug() << "Received message:" << QJsonDocument(message).toJson(QJsonDocument::Compact);
+
     emit messageReceived(message);
 
     // Call registered callback if available
@@ -129,12 +208,19 @@ void NetworkManager::processMessage(const QJsonObject &message)
 void NetworkManager::sendMessage(const QJsonObject &message)
 {
     if (!isConnected()) {
-        qWarning() << "Cannot send message: not connected";
+        qWarning() << "Cannot send message: not connected or not encrypted";
         return;
     }
 
     QJsonDocument doc(message);
     QByteArray data = doc.toJson(QJsonDocument::Compact) + "\n";
-    m_socket->write(data);
-    m_socket->flush();
+
+    qDebug() << "Sending message:" << doc.toJson(QJsonDocument::Compact);
+
+    qint64 written = m_socket->write(data);
+    if (written == -1) {
+        qWarning() << "Failed to write to socket:" << m_socket->errorString();
+    } else {
+        m_socket->flush();
+    }
 }
