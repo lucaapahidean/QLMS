@@ -5,6 +5,18 @@
 #include "studentdashboard.h"
 #include <QApplication>
 
+BaseDashboardWindow *createDashboard(const QString &role, const QString &username, int userId)
+{
+    if (role == "admin") {
+        return new AdminDashboard(username, userId);
+    } else if (role == "instructor") {
+        return new InstructorDashboard(username, userId);
+    } else if (role == "student") {
+        return new StudentDashboard(username, userId);
+    }
+    return nullptr;
+}
+
 int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
@@ -12,38 +24,61 @@ int main(int argc, char *argv[])
     app.setApplicationDisplayName("Qt Learning Management System");
     app.setOrganizationName("QLMS");
 
-    // Show login dialog
-    LoginDialog loginDialog;
-    if (loginDialog.exec() != QDialog::Accepted) {
-        return 0;
+    BaseDashboardWindow *currentDashboard = nullptr;
+
+    // Main application loop - keeps running until user explicitly exits
+    while (true) {
+        // Clean up previous dashboard if it exists
+        if (currentDashboard) {
+            currentDashboard->deleteLater();
+            currentDashboard = nullptr;
+        }
+
+        // Show login dialog
+        LoginDialog loginDialog;
+        if (loginDialog.exec() != QDialog::Accepted) {
+            // User cancelled login or closed dialog - exit application
+            break;
+        }
+
+        // Get user information
+        QString username = loginDialog.getUsername();
+        QString role = loginDialog.getRole();
+        int userId = loginDialog.getUserId();
+
+        // Create appropriate dashboard based on role
+        currentDashboard = createDashboard(role, username, userId);
+        if (!currentDashboard) {
+            // Should not happen, but handle gracefully
+            break;
+        }
+
+        // Connect logout signal to continue the loop
+        bool logoutRequested = false;
+        QObject::connect(currentDashboard,
+                         &BaseDashboardWindow::logoutRequested,
+                         [&logoutRequested]() {
+                             logoutRequested = true;
+                             QApplication::quit(); // Exit the current event loop
+                         });
+
+        // Show dashboard and start event loop
+        currentDashboard->show();
+        app.exec();
+
+        // Check if we exited due to logout or application exit
+        if (!logoutRequested) {
+            // Application was closed normally (Exit menu or window close)
+            break;
+        }
+        // If logoutRequested is true, continue the loop to show login again
     }
 
-    // Get user information
-    QString username = loginDialog.getUsername();
-    QString role = loginDialog.getRole();
-    int userId = loginDialog.getUserId();
-
-    // Create and show appropriate dashboard based on role
-    BaseDashboardWindow *dashboard = nullptr;
-
-    if (role == "admin") {
-        dashboard = new AdminDashboard(username, userId);
-    } else if (role == "instructor") {
-        dashboard = new InstructorDashboard(username, userId);
-    } else if (role == "student") {
-        dashboard = new StudentDashboard(username, userId);
-    } else {
-        // Should not happen
-        return 1;
+    // Final cleanup
+    if (currentDashboard) {
+        delete currentDashboard;
     }
-
-    dashboard->show();
-
-    int result = app.exec();
-
-    // Cleanup
-    delete dashboard;
     NetworkManager::instance().disconnectFromServer();
 
-    return result;
+    return 0;
 }

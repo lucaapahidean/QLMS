@@ -14,6 +14,9 @@ class BaseDashboardWindow : public QMainWindow
 public:
     explicit BaseDashboardWindow(const QString &username, int userId, QWidget *parent = nullptr);
 
+signals:
+    void logoutRequested();
+
 protected:
     void setupMenuBar();
     void setCentralWorkspace(QWidget *widget);

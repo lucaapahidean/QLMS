@@ -17,6 +17,7 @@ LoginDialog::LoginDialog(QWidget *parent)
     setWindowTitle("QLMS - Login");
     setFixedSize(400, 300);
 
+    // Connect to NetworkManager signals for real-time updates
     connect(&NetworkManager::instance(), &NetworkManager::connected, this, [this]() {
         setConnectionState(true);
     });
@@ -30,6 +31,9 @@ LoginDialog::LoginDialog(QWidget *parent)
                 QMessageBox::critical(this, "Connection Error", error);
                 setConnectionState(false);
             });
+
+    // Update the connection state based on current status
+    updateConnectionState();
 }
 
 void LoginDialog::setupUi()
@@ -85,6 +89,13 @@ void LoginDialog::setupUi()
     connect(m_passwordEdit, &QLineEdit::returnPressed, this, &LoginDialog::onLoginClicked);
 }
 
+void LoginDialog::updateConnectionState()
+{
+    // Check current connection state and update UI accordingly
+    bool connected = NetworkManager::instance().isConnected();
+    setConnectionState(connected);
+}
+
 void LoginDialog::setConnectionState(bool connected)
 {
     m_serverEdit->setEnabled(!connected);
@@ -92,6 +103,13 @@ void LoginDialog::setConnectionState(bool connected)
     m_connectButton->setText(connected ? "Disconnect" : "Connect");
     m_loginButton->setEnabled(connected);
     m_statusLabel->setText(connected ? "Connected to server" : "Not connected");
+
+    if (connected) {
+        // Clear login fields and focus on username when connected
+        m_usernameEdit->clear();
+        m_passwordEdit->clear();
+        m_usernameEdit->setFocus();
+    }
 }
 
 void LoginDialog::onConnectClicked()
@@ -138,6 +156,7 @@ void LoginDialog::onLoginResponse(const QJsonObject &response)
         m_username = user["username"].toString();
         m_role = user["role"].toString();
         m_userId = user["user_id"].toInt();
+        m_statusLabel->setText("Login successful");
         accept();
     } else {
         m_statusLabel->setText("Login failed");

@@ -69,5 +69,5 @@ void BaseDashboardWindow::onLogout()
 {
     QJsonObject data;
     NetworkManager::instance().sendCommand("LOGOUT", data);
-    close();
+    emit logoutRequested();
 }
