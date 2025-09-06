@@ -95,10 +95,11 @@ void GradingWidget::onSubmitGrade()
     int attemptId = m_attemptsTable->item(row, 0)->text().toInt();
     QString studentName = m_attemptsTable->item(row, 1)->text();
 
+    // Fixed: Use Qt-style formatting consistently
     int ret = QMessageBox::question(this,
                                     "Submit Grade",
-                                    QString("Submit grade of %.2f%% for %1?")
-                                        .arg(m_scoreSpinBox->value())
+                                    QString("Submit grade of %1% for %2?")
+                                        .arg(QString::number(m_scoreSpinBox->value(), 'f', 2))
                                         .arg(studentName),
                                     QMessageBox::Yes | QMessageBox::No);
 
