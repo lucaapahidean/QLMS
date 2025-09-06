@@ -17,9 +17,10 @@ Server::Server(QObject *parent)
     QFile keyFile("server.key");
 
     if (!certFile.exists() || !keyFile.exists()) {
-        qWarning() << "Certificate files not found in current directory, trying parent directory";
-        certFile.setFileName("../server.crt");
-        keyFile.setFileName("../server.key");
+        qWarning()
+            << "Certificate files not found in current directory, trying QLMSServer directory";
+        certFile.setFileName("../../server.crt");
+        keyFile.setFileName("../../server.key");
     }
 
     if (!certFile.open(QIODevice::ReadOnly) || !keyFile.open(QIODevice::ReadOnly)) {
