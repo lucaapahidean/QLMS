@@ -280,7 +280,7 @@ std::shared_ptr<Quiz> DatabaseManager::loadQuizDetails(int quizId)
 
     // Load questions
     QSqlQuery questionsQuery(db);
-    questionsQuery.prepare("SELECT question_id, prompt, question_type "
+    questionsQuery.prepare("SELECT question_id, quiz_id, prompt, question_type "
                            "FROM questions WHERE quiz_id = :id ORDER BY question_id");
     questionsQuery.bindValue(":id", quizId);
 
@@ -355,7 +355,14 @@ int DatabaseManager::createQuiz(const QString &title, int maxAttempts)
         "INSERT INTO course_materials (title, type) VALUES (:title, 'quiz') RETURNING material_id");
     query.bindValue(":title", title);
 
-    if (!query.exec() || !query.next()) {
+    if (!query.exec()) {
+        qCritical() << "Failed to insert course material:" << query.lastError().text();
+        db.rollback();
+        return -1;
+    }
+
+    if (!query.next()) {
+        qCritical() << "Failed to get material_id from INSERT";
         db.rollback();
         return -1;
     }

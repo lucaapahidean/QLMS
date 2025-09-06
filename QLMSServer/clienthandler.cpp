@@ -79,6 +79,8 @@ void ClientHandler::processMessage(const QJsonObject &message)
         handleLogin(data);
     } else if (command == "LOGOUT") {
         handleLogout();
+    } else if (command == "GET_MATERIALS") {
+        handleGetMaterials();
     } else if (!m_currentUser) {
         QJsonObject response;
         response["type"] = "ERROR";
@@ -90,8 +92,6 @@ void ClientHandler::processMessage(const QJsonObject &message)
         handleDeleteUser(data);
     } else if (command == "GET_ALL_USERS") {
         handleGetAllUsers();
-    } else if (command == "GET_MATERIALS") {
-        handleGetMaterials();
     } else if (command == "CREATE_QUIZ") {
         handleCreateQuiz(data);
     } else if (command == "ADD_QUESTION") {

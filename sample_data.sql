@@ -96,6 +96,12 @@ INSERT INTO answers (attempt_id, question_id, student_response) VALUES
 (3, 2, '0,1,2,3'),
 (3, 3, 'Compilers are faster but interpreters are more flexible for development.');
 
+-- Fix sequences after explicit inserts
+SELECT setval('course_materials_material_id_seq', (SELECT MAX(material_id) FROM course_materials));
+SELECT setval('questions_question_id_seq', (SELECT MAX(question_id) FROM questions));
+SELECT setval('quiz_attempts_attempt_id_seq', (SELECT MAX(attempt_id) FROM quiz_attempts));
+SELECT setval('users_user_id_seq', (SELECT MAX(user_id) FROM users));
+
 -- Display summary
 SELECT 'Sample data loaded successfully!' as message;
 SELECT 'Users created:' as info, COUNT(*) as count FROM users;
