@@ -11,6 +11,8 @@ class QSpinBox;
 class QComboBox;
 class QTableWidget;
 class QListWidget;
+class QListWidgetItem;
+class QPushButton;
 QT_END_NAMESPACE
 
 class MaterialCreationWizard : public QWizard
@@ -71,15 +73,22 @@ public:
     int nextId() const override;
 
 private slots:
-    void onAddQuestion();
+    void onAddOrUpdateQuestion();
+    void onNewQuestion();
     void onRemoveQuestion();
+    void onQuestionSelected(QListWidgetItem *item);
     void onQuestionTypeChanged(const QString &type);
     void onAddOption();
     void onRemoveOption();
 
 private:
+    void loadQuestionForEditing(int index);
+    void clearEditor();
+    QJsonObject createQuestionFromEditor();
+
     QListWidget *m_questionsList;
-    QPushButton *m_addQuestionButton;
+    QPushButton *m_newQuestionButton;
+    QPushButton *m_addOrUpdateQuestionButton;
     QPushButton *m_removeQuestionButton;
 
     // Question details
@@ -90,6 +99,7 @@ private:
     QPushButton *m_removeOptionButton;
 
     QJsonArray m_questions;
+    int m_currentQuestionIndex = -1; // -1 means new question, otherwise it's the index
 };
 
 class ConclusionPage : public QWizardPage

@@ -27,6 +27,7 @@ MaterialCreationWizard::MaterialCreationWizard(QWidget *parent)
     addPage(new ConclusionPage);
 
     setWindowTitle("Material Creation Wizard");
+    resize(800, 600); // Make the wizard larger by default
 }
 
 void MaterialCreationWizard::accept()
@@ -159,8 +160,9 @@ int QuizPage::nextId() const
 QuestionsPage::QuestionsPage(QWidget *parent)
     : QWizardPage(parent)
 {
-    setTitle("Add Questions");
-    setSubTitle("Add questions and their options to the quiz.");
+    setTitle("Add & Edit Questions");
+    setSubTitle(
+        "Add questions and their options to the quiz. Select a question from the list to edit it.");
 
     auto *mainLayout = new QHBoxLayout(this);
     auto *splitter = new QSplitter(Qt::Horizontal, this);
@@ -169,13 +171,14 @@ QuestionsPage::QuestionsPage(QWidget *parent)
     auto *leftWidget = new QWidget(this);
     auto *leftLayout = new QVBoxLayout(leftWidget);
     m_questionsList = new QListWidget(this);
+    m_questionsList->setWordWrap(true);
     leftLayout->addWidget(new QLabel("Questions:", this));
     leftLayout->addWidget(m_questionsList);
 
     auto *questionButtonsLayout = new QHBoxLayout();
-    m_addQuestionButton = new QPushButton("Add Question", this);
-    m_removeQuestionButton = new QPushButton("Remove Question", this);
-    questionButtonsLayout->addWidget(m_addQuestionButton);
+    m_newQuestionButton = new QPushButton("New Question", this);
+    m_removeQuestionButton = new QPushButton("Remove Selected", this);
+    questionButtonsLayout->addWidget(m_newQuestionButton);
     questionButtonsLayout->addWidget(m_removeQuestionButton);
     leftLayout->addLayout(questionButtonsLayout);
     splitter->addWidget(leftWidget);
@@ -184,28 +187,24 @@ QuestionsPage::QuestionsPage(QWidget *parent)
     auto *rightWidget = new QWidget(this);
     auto *rightLayout = new QVBoxLayout(rightWidget);
 
-    rightLayout->addWidget(new QLabel("Question Prompt:", this));
+    rightLayout->addWidget(new QLabel("Question Editor:", this));
     m_questionPromptEdit = new QTextEdit(this);
-    m_questionPromptEdit->setMaximumHeight(100);
+    m_questionPromptEdit->setMaximumHeight(150);
     rightLayout->addWidget(m_questionPromptEdit);
 
     auto *typeLayout = new QHBoxLayout();
     typeLayout->addWidget(new QLabel("Question Type:", this));
     m_questionTypeCombo = new QComboBox(this);
-    m_questionTypeCombo->addItems(QStringList() << "radio"
-                                                << "checkbox"
-                                                << "open_answer");
+    m_questionTypeCombo->addItems(QStringList() << "radio" << "checkbox" << "open_answer");
     typeLayout->addWidget(m_questionTypeCombo);
     typeLayout->addStretch();
     rightLayout->addLayout(typeLayout);
 
     // Options table for multiple choice questions
-    rightLayout->addWidget(new QLabel("Options (for multiple choice):", this));
+    rightLayout->addWidget(new QLabel("Options (for radio/checkbox):", this));
     m_optionsTable = new QTableWidget(0, 2, this);
-    m_optionsTable->setHorizontalHeaderLabels(QStringList() << "Option Text"
-                                                            << "Is Correct");
+    m_optionsTable->setHorizontalHeaderLabels(QStringList() << "Option Text" << "Is Correct");
     m_optionsTable->horizontalHeader()->setStretchLastSection(true);
-    m_optionsTable->setMaximumHeight(150);
     rightLayout->addWidget(m_optionsTable);
 
     auto *optionsButtonLayout = new QHBoxLayout();
@@ -215,13 +214,24 @@ QuestionsPage::QuestionsPage(QWidget *parent)
     optionsButtonLayout->addWidget(m_removeOptionButton);
     optionsButtonLayout->addStretch();
     rightLayout->addLayout(optionsButtonLayout);
-    splitter->addWidget(rightWidget);
+    rightLayout->addStretch();
 
+    m_addOrUpdateQuestionButton = new QPushButton("Add Question", this);
+    rightLayout->addWidget(m_addOrUpdateQuestionButton);
+
+    splitter->addWidget(rightWidget);
+    splitter->setStretchFactor(0, 1);
+    splitter->setStretchFactor(1, 2);
     mainLayout->addWidget(splitter);
 
     // Connections
-    connect(m_addQuestionButton, &QPushButton::clicked, this, &QuestionsPage::onAddQuestion);
+    connect(m_newQuestionButton, &QPushButton::clicked, this, &QuestionsPage::onNewQuestion);
+    connect(m_addOrUpdateQuestionButton,
+            &QPushButton::clicked,
+            this,
+            &QuestionsPage::onAddOrUpdateQuestion);
     connect(m_removeQuestionButton, &QPushButton::clicked, this, &QuestionsPage::onRemoveQuestion);
+    connect(m_questionsList, &QListWidget::itemClicked, this, &QuestionsPage::onQuestionSelected);
     connect(m_questionTypeCombo,
             &QComboBox::currentTextChanged,
             this,
@@ -231,7 +241,7 @@ QuestionsPage::QuestionsPage(QWidget *parent)
 
     registerField("quiz.questions", this, "questionsJson");
 
-    onQuestionTypeChanged(m_questionTypeCombo->currentText());
+    onNewQuestion(); // Start in "new question" mode
 }
 
 bool QuestionsPage::isComplete() const
@@ -244,11 +254,96 @@ int QuestionsPage::nextId() const
     return MaterialCreationWizard::Page_Conclusion;
 }
 
-void QuestionsPage::onAddQuestion()
+void QuestionsPage::onNewQuestion()
+{
+    m_questionsList->setCurrentRow(-1);
+    clearEditor();
+    m_currentQuestionIndex = -1;
+    m_addOrUpdateQuestionButton->setText("Add Question");
+    m_questionPromptEdit->setFocus();
+}
+
+void QuestionsPage::onAddOrUpdateQuestion()
+{
+    QJsonObject question = createQuestionFromEditor();
+    if (question.isEmpty()) {
+        return; // createQuestionFromEditor will show a message box on error
+    }
+
+    if (m_currentQuestionIndex == -1) { // Adding a new question
+        m_questions.append(question);
+        m_questionsList->addItem(question["prompt"].toString());
+    } else { // Updating an existing question
+        m_questions[m_currentQuestionIndex] = question;
+        m_questionsList->item(m_currentQuestionIndex)->setText(question["prompt"].toString());
+    }
+
+    onNewQuestion(); // Clear editor for next question
+    emit completeChanged();
+}
+
+void QuestionsPage::onRemoveQuestion()
+{
+    int row = m_questionsList->currentRow();
+    if (row >= 0) {
+        m_questions.removeAt(row);
+        delete m_questionsList->takeItem(row);
+
+        onNewQuestion(); // Go back to a clean state
+        emit completeChanged();
+    }
+}
+
+void QuestionsPage::onQuestionSelected(QListWidgetItem *item)
+{
+    Q_UNUSED(item);
+    int row = m_questionsList->currentRow();
+    if (row >= 0) {
+        loadQuestionForEditing(row);
+    }
+}
+
+void QuestionsPage::loadQuestionForEditing(int index)
+{
+    if (index < 0 || index >= m_questions.size())
+        return;
+
+    m_currentQuestionIndex = index;
+    m_addOrUpdateQuestionButton->setText("Update Question");
+
+    QJsonObject question = m_questions[index].toObject();
+    m_questionPromptEdit->setPlainText(question["prompt"].toString());
+    m_questionTypeCombo->setCurrentText(question["question_type"].toString());
+
+    onQuestionTypeChanged(m_questionTypeCombo->currentText()); // Enable/disable options table
+
+    m_optionsTable->setRowCount(0); // Clear existing options
+    if (question.contains("options")) {
+        QJsonArray options = question["options"].toArray();
+        for (const QJsonValue &val : options) {
+            QJsonObject option = val.toObject();
+            int newRow = m_optionsTable->rowCount();
+            m_optionsTable->insertRow(newRow);
+            m_optionsTable->setItem(newRow, 0, new QTableWidgetItem(option["text"].toString()));
+            auto *checkBox = new QCheckBox(this);
+            checkBox->setChecked(option["is_correct"].toBool());
+            m_optionsTable->setCellWidget(newRow, 1, checkBox);
+        }
+    }
+}
+
+void QuestionsPage::clearEditor()
+{
+    m_questionPromptEdit->clear();
+    m_questionTypeCombo->setCurrentIndex(0);
+    m_optionsTable->setRowCount(0);
+}
+
+QJsonObject QuestionsPage::createQuestionFromEditor()
 {
     if (m_questionPromptEdit->toPlainText().isEmpty()) {
-        QMessageBox::warning(this, "Add Question", "Please enter a question prompt.");
-        return;
+        QMessageBox::warning(this, "Validation Error", "Please enter a question prompt.");
+        return QJsonObject();
     }
 
     QJsonObject question;
@@ -260,6 +355,12 @@ void QuestionsPage::onAddQuestion()
         bool hasCorrectOption = false;
         for (int i = 0; i < m_optionsTable->rowCount(); ++i) {
             QJsonObject option;
+            if (!m_optionsTable->item(i, 0) || m_optionsTable->item(i, 0)->text().isEmpty()) {
+                QMessageBox::warning(this,
+                                     "Validation Error",
+                                     QString("Option text for row %1 cannot be empty.").arg(i + 1));
+                return QJsonObject();
+            }
             option["text"] = m_optionsTable->item(i, 0)->text();
             auto *checkBox = qobject_cast<QCheckBox *>(m_optionsTable->cellWidget(i, 1));
             bool isCorrect = checkBox ? checkBox->isChecked() : false;
@@ -269,38 +370,31 @@ void QuestionsPage::onAddQuestion()
             options.append(option);
         }
 
+        if (m_optionsTable->rowCount() < 2) {
+            QMessageBox::warning(this,
+                                 "Validation Error",
+                                 "Multiple choice questions must have at least two options.");
+            return QJsonObject();
+        }
+
         if (!hasCorrectOption) {
             QMessageBox::warning(this,
-                                 "Add Question",
+                                 "Validation Error",
                                  "At least one option must be marked as correct.");
-            return;
+            return QJsonObject();
         }
         question["options"] = options;
     }
 
-    m_questions.append(question);
-    m_questionsList->addItem(m_questionPromptEdit->toPlainText());
-    m_questionPromptEdit->clear();
-    m_optionsTable->setRowCount(0);
-    emit completeChanged();
-}
-
-void QuestionsPage::onRemoveQuestion()
-{
-    int row = m_questionsList->currentRow();
-    if (row >= 0) {
-        m_questions.removeAt(row);
-        delete m_questionsList->takeItem(row);
-        emit completeChanged();
-    }
+    return question;
 }
 
 void QuestionsPage::onQuestionTypeChanged(const QString &type)
 {
     bool showOptions = (type != "open_answer");
-    m_optionsTable->setEnabled(showOptions);
-    m_addOptionButton->setEnabled(showOptions);
-    m_removeOptionButton->setEnabled(showOptions);
+    m_optionsTable->setVisible(showOptions);
+    m_addOptionButton->setVisible(showOptions);
+    m_removeOptionButton->setVisible(showOptions);
 
     if (!showOptions) {
         m_optionsTable->setRowCount(0);
@@ -311,8 +405,7 @@ void QuestionsPage::onAddOption()
 {
     int row = m_optionsTable->rowCount();
     m_optionsTable->insertRow(row);
-    m_optionsTable->setItem(row, 0, new QTableWidgetItem(""));
-
+    m_optionsTable->setItem(row, 0, new QTableWidgetItem("New Option"));
     auto *checkBox = new QCheckBox(this);
     m_optionsTable->setCellWidget(row, 1, checkBox);
 }
