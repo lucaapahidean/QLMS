@@ -67,8 +67,20 @@ void CourseEditorWidget::setupUi()
     m_maxAttemptsSpinBox->setValue(1);
     quizLayout->addWidget(m_maxAttemptsSpinBox, 1, 1);
 
+    quizLayout->addWidget(new QLabel("Feedback Type:", this), 2, 0);
+    m_feedbackTypeCombo = new QComboBox(this);
+    m_feedbackTypeCombo->addItem("Show answers and explanations", "detailed_with_answers");
+    m_feedbackTypeCombo->addItem("Show right/wrong only", "detailed_without_answers");
+    m_feedbackTypeCombo->addItem("Show score only", "score_only");
+    m_feedbackTypeCombo->setToolTip(
+        "Controls what students see after submitting the quiz:\n"
+        "• Show answers: Students see which answers were wrong and the correct answers\n"
+        "• Right/wrong only: Students see which answers were wrong but not the correct answers\n"
+        "• Score only: Students only see their total score");
+    quizLayout->addWidget(m_feedbackTypeCombo, 2, 1);
+
     m_createQuizButton = new QPushButton("Create Quiz", this);
-    quizLayout->addWidget(m_createQuizButton, 2, 0, 1, 2);
+    quizLayout->addWidget(m_createQuizButton, 3, 0, 1, 2);
 
     rightLayout->addWidget(quizGroup);
 
@@ -156,6 +168,7 @@ void CourseEditorWidget::onCreateQuiz()
     QJsonObject data;
     data["title"] = m_quizTitleEdit->text();
     data["max_attempts"] = m_maxAttemptsSpinBox->value();
+    data["feedback_type"] = m_feedbackTypeCombo->currentData().toString();
 
     NetworkManager::instance().sendCommand("CREATE_QUIZ", data, [this](const QJsonObject &response) {
         if (response["type"].toString() == "OK") {
@@ -187,13 +200,26 @@ void CourseEditorWidget::onAddQuestion()
     // Add options for multiple choice questions
     if (m_questionTypeCombo->currentText() != "open_answer") {
         QJsonArray options;
+        bool hasCorrectOption = false;
+
         for (int i = 0; i < m_optionsTable->rowCount(); ++i) {
             QJsonObject option;
             option["text"] = m_optionsTable->item(i, 0)->text();
             auto *checkBox = qobject_cast<QCheckBox *>(m_optionsTable->cellWidget(i, 1));
-            option["is_correct"] = checkBox ? checkBox->isChecked() : false;
+            bool isCorrect = checkBox ? checkBox->isChecked() : false;
+            option["is_correct"] = isCorrect;
+            if (isCorrect)
+                hasCorrectOption = true;
             options.append(option);
         }
+
+        if (!hasCorrectOption) {
+            QMessageBox::warning(this,
+                                 "Add Question",
+                                 "At least one option must be marked as correct");
+            return;
+        }
+
         data["options"] = options;
     }
 

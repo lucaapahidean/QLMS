@@ -29,6 +29,8 @@ QJsonObject TextLesson::toJson() const
 
 Quiz::Quiz(int id, const QString &title)
     : CourseMaterial(id, title)
+    , m_maxAttempts(1)
+    , m_feedbackType("detailed_with_answers")
 {}
 
 void Quiz::addQuestion(std::shared_ptr<Question> question)
@@ -40,6 +42,7 @@ QJsonObject Quiz::toJson() const
 {
     QJsonObject obj = CourseMaterial::toJson();
     obj["max_attempts"] = m_maxAttempts;
+    obj["feedback_type"] = m_feedbackType;
 
     QJsonArray questionsArray;
     for (const auto &question : m_questions) {

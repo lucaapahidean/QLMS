@@ -42,6 +42,7 @@ private:
     // Quiz creation form
     QLineEdit *m_quizTitleEdit;
     QSpinBox *m_maxAttemptsSpinBox;
+    QComboBox *m_feedbackTypeCombo; // New field for feedback type
 
     // Question creation form
     QLineEdit *m_currentQuizIdEdit;

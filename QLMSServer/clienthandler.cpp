@@ -104,6 +104,10 @@ void ClientHandler::processMessage(const QJsonObject &message)
         handleGetPendingAttempts();
     } else if (command == "SUBMIT_GRADE") {
         handleSubmitGrade(data);
+    } else if (command == "GET_MY_ATTEMPTS") {
+        handleGetMyAttempts();
+    } else if (command == "GET_ATTEMPT_DETAILS") {
+        handleGetAttemptDetails(data);
     } else {
         QJsonObject response;
         response["type"] = "ERROR";
@@ -263,8 +267,9 @@ void ClientHandler::handleCreateQuiz(const QJsonObject &data)
 
     QString title = data["title"].toString();
     int maxAttempts = data["max_attempts"].toInt(1);
+    QString feedbackType = data["feedback_type"].toString("detailed_with_answers");
 
-    int quizId = DatabaseManager::instance().createQuiz(title, maxAttempts);
+    int quizId = DatabaseManager::instance().createQuiz(title, maxAttempts, feedbackType);
 
     QJsonObject response;
     if (quizId > 0) {
@@ -382,12 +387,74 @@ void ClientHandler::handleFinishAttempt(const QJsonObject &data)
                                                answer["response"].toString());
     }
 
-    // For now, mark as pending manual grading
-    DatabaseManager::instance().finalizeAttempt(attemptId, "pending_manual_grading");
+    // Auto-grade the attempt
+    QJsonObject gradeResult = DatabaseManager::instance().autoGradeQuizAttempt(attemptId);
+
+    if (!gradeResult["success"].toBool()) {
+        QJsonObject response;
+        response["type"] = "ERROR";
+        response["message"] = "Failed to grade quiz attempt";
+        sendResponse(response);
+        return;
+    }
 
     QJsonObject response;
     response["type"] = "OK";
     response["message"] = "Quiz submitted successfully";
+    response["status"] = gradeResult["status"].toString();
+    response["auto_score"] = gradeResult["auto_score"].toDouble();
+    response["has_open_answers"] = gradeResult["has_open_answers"].toBool();
+    response["feedback_type"] = gradeResult["feedback_type"].toString();
+    sendResponse(response);
+}
+
+void ClientHandler::handleGetMyAttempts()
+{
+    if (!m_currentUser || m_currentUser->getRole() != "student") {
+        QJsonObject response;
+        response["type"] = "ERROR";
+        response["message"] = "Unauthorized";
+        sendResponse(response);
+        return;
+    }
+
+    QJsonArray attempts = DatabaseManager::instance().getStudentQuizAttempts(m_currentUser->getId());
+
+    QJsonObject response;
+    response["type"] = "DATA_RESPONSE";
+    response["data"] = attempts;
+    sendResponse(response);
+}
+
+void ClientHandler::handleGetAttemptDetails(const QJsonObject &data)
+{
+    if (!m_currentUser) {
+        QJsonObject response;
+        response["type"] = "ERROR";
+        response["message"] = "Unauthorized";
+        sendResponse(response);
+        return;
+    }
+
+    int attemptId = data["attempt_id"].toInt();
+
+    // Students can only view their own attempts
+    int studentId = m_currentUser->getRole() == "student" ? m_currentUser->getId() : -1;
+
+    QJsonObject attemptDetails = DatabaseManager::instance().getQuizAttemptDetails(attemptId,
+                                                                                   studentId);
+
+    if (attemptDetails.isEmpty()) {
+        QJsonObject response;
+        response["type"] = "ERROR";
+        response["message"] = "Attempt not found or access denied";
+        sendResponse(response);
+        return;
+    }
+
+    QJsonObject response;
+    response["type"] = "DATA_RESPONSE";
+    response["data"] = attemptDetails;
     sendResponse(response);
 }
 

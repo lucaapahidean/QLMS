@@ -46,6 +46,10 @@ private:
     void handleGetPendingAttempts();
     void handleSubmitGrade(const QJsonObject &data);
 
+    // New handlers for quiz history
+    void handleGetMyAttempts();
+    void handleGetAttemptDetails(const QJsonObject &data);
+
     QSslSocket *m_socket;
     QByteArray m_buffer;
     std::shared_ptr<User> m_currentUser;

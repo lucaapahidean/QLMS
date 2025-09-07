@@ -34,17 +34,24 @@ public:
     // Course material operations
     QList<std::shared_ptr<CourseMaterial>> getAllMaterials();
     std::shared_ptr<CourseMaterial> getMaterialById(int materialId);
-    int createQuiz(const QString &title, int maxAttempts);
+    int createQuiz(const QString &title,
+                   int maxAttempts,
+                   const QString &feedbackType = "detailed_with_answers");
     int addQuestion(int quizId, const QString &prompt, const QString &questionType);
     bool addQuestionOption(int questionId, const QString &text, bool isCorrect);
 
     // Quiz attempt operations
     int createQuizAttempt(int quizId, int studentId, int attemptNumber);
     bool saveAnswer(int attemptId, int questionId, const QString &response);
+    QJsonObject autoGradeQuizAttempt(int attemptId);
     bool finalizeAttempt(int attemptId, const QString &status, float score = -1);
     QJsonArray getPendingAttempts();
-    bool submitGrade(int attemptId, float score);
+    bool submitGrade(int attemptId, float manualScore);
     int getAttemptCount(int quizId, int studentId);
+
+    // New methods for quiz history and attempt details
+    QJsonArray getStudentQuizAttempts(int studentId);
+    QJsonObject getQuizAttemptDetails(int attemptId, int studentId = -1);
 
 private:
     DatabaseManager();

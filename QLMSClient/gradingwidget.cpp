@@ -40,24 +40,36 @@ void GradingWidget::setupUi()
     mainLayout->addWidget(new QLabel("Pending Manual Grading:", this));
 
     m_attemptsTable = new QTableWidget(this);
-    m_attemptsTable->setColumnCount(5);
+    m_attemptsTable->setColumnCount(7);
     m_attemptsTable->setHorizontalHeaderLabels(
-        QStringList() << "Attempt ID" << "Student" << "Quiz Title" << "Attempt #" << "Status");
+        QStringList() << "Attempt ID" << "Student" << "Quiz Title" << "Attempt #"
+                      << "Auto Score" << "Open Questions" << "Status");
     m_attemptsTable->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_attemptsTable->setAlternatingRowColors(true);
     m_attemptsTable->horizontalHeader()->setStretchLastSection(true);
     mainLayout->addWidget(m_attemptsTable);
 
+    // Score info group
+    auto *scoreInfoGroup = new QGroupBox("Scoring Information", this);
+    auto *scoreInfoLayout = new QVBoxLayout(scoreInfoGroup);
+
+    m_scoreInfoLabel = new QLabel(this);
+    m_scoreInfoLabel->setWordWrap(true);
+    scoreInfoLayout->addWidget(m_scoreInfoLabel);
+
+    mainLayout->addWidget(scoreInfoGroup);
+
     // Grading controls
-    auto *gradingGroup = new QGroupBox("Submit Grade", this);
+    auto *gradingGroup = new QGroupBox("Submit Manual Grade", this);
     auto *gradingLayout = new QHBoxLayout(gradingGroup);
 
-    gradingLayout->addWidget(new QLabel("Score:", this));
+    gradingLayout->addWidget(new QLabel("Score for Open Answer Questions:", this));
 
     m_scoreSpinBox = new QDoubleSpinBox(this);
     m_scoreSpinBox->setRange(0.0, 100.0);
     m_scoreSpinBox->setSuffix("%");
     m_scoreSpinBox->setDecimals(2);
+    m_scoreSpinBox->setToolTip("Enter the percentage score for the open answer questions only");
     gradingLayout->addWidget(m_scoreSpinBox);
 
     m_submitGradeButton = new QPushButton("Submit Grade", this);
@@ -73,8 +85,37 @@ void GradingWidget::setupUi()
     connect(m_refreshButton, &QPushButton::clicked, this, &GradingWidget::onRefreshPendingAttempts);
     connect(m_submitGradeButton, &QPushButton::clicked, this, &GradingWidget::onSubmitGrade);
     connect(m_attemptsTable, &QTableWidget::itemSelectionChanged, this, [this]() {
-        m_submitGradeButton->setEnabled(m_attemptsTable->currentRow() >= 0);
+        bool hasSelection = m_attemptsTable->currentRow() >= 0;
+        m_submitGradeButton->setEnabled(hasSelection);
+
+        if (hasSelection) {
+            updateScoreInfo();
+        } else {
+            m_scoreInfoLabel->clear();
+        }
     });
+}
+
+void GradingWidget::updateScoreInfo()
+{
+    int row = m_attemptsTable->currentRow();
+    if (row < 0)
+        return;
+
+    QString autoScore = m_attemptsTable->item(row, 4)->text();
+    QString openQuestions = m_attemptsTable->item(row, 5)->text();
+    QString studentName = m_attemptsTable->item(row, 1)->text();
+
+    QString info = QString("Student: %1\n"
+                           "Auto-graded score: %2\n"
+                           "Number of open answer questions: %3\n\n"
+                           "Enter the manual score for the open answer questions. "
+                           "The final grade will be calculated as a weighted average.")
+                       .arg(studentName)
+                       .arg(autoScore)
+                       .arg(openQuestions);
+
+    m_scoreInfoLabel->setText(info);
 }
 
 void GradingWidget::onRefreshPendingAttempts()
@@ -94,13 +135,18 @@ void GradingWidget::onSubmitGrade()
 
     int attemptId = m_attemptsTable->item(row, 0)->text().toInt();
     QString studentName = m_attemptsTable->item(row, 1)->text();
+    QString autoScore = m_attemptsTable->item(row, 4)->text();
 
-    // Fixed: Use Qt-style formatting consistently
     int ret = QMessageBox::question(this,
                                     "Submit Grade",
-                                    QString("Submit grade of %1% for %2?")
+                                    QString(
+                                        "Submit manual grade of %1% for open answer questions?\n\n"
+                                        "Student: %2\n"
+                                        "Auto-graded score: %3\n"
+                                        "The final grade will be calculated automatically.")
                                         .arg(QString::number(m_scoreSpinBox->value(), 'f', 2))
-                                        .arg(studentName),
+                                        .arg(studentName)
+                                        .arg(autoScore),
                                     QMessageBox::Yes | QMessageBox::No);
 
     if (ret == QMessageBox::Yes) {
@@ -113,6 +159,7 @@ void GradingWidget::onSubmitGrade()
                 if (response["type"].toString() == "OK") {
                     QMessageBox::information(this, "Success", "Grade submitted successfully");
                     onRefreshPendingAttempts();
+                    m_scoreInfoLabel->clear();
                 } else {
                     QMessageBox::critical(this, "Error", response["message"].toString());
                 }
@@ -146,7 +193,18 @@ void GradingWidget::populateAttemptsTable(const QJsonArray &attempts)
                                  3,
                                  new QTableWidgetItem(
                                      QString::number(attempt["attempt_number"].toInt())));
-        m_attemptsTable->setItem(row, 4, new QTableWidgetItem("Pending"));
+
+        // Show auto score
+        double autoScore = attempt["auto_score"].toDouble();
+        m_attemptsTable->setItem(row,
+                                 4,
+                                 new QTableWidgetItem(QString("%1%").arg(autoScore, 0, 'f', 1)));
+
+        // Show number of open questions
+        int manualQuestions = attempt["total_manual_points"].toInt();
+        m_attemptsTable->setItem(row, 5, new QTableWidgetItem(QString::number(manualQuestions)));
+
+        m_attemptsTable->setItem(row, 6, new QTableWidgetItem("Pending"));
     }
 
     m_attemptsTable->resizeColumnsToContents();

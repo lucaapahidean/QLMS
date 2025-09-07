@@ -54,6 +54,9 @@ public:
     int getMaxAttempts() const { return m_maxAttempts; }
     void setMaxAttempts(int attempts) { m_maxAttempts = attempts; }
 
+    QString getFeedbackType() const { return m_feedbackType; }
+    void setFeedbackType(const QString &type) { m_feedbackType = type; }
+
     void addQuestion(std::shared_ptr<Question> question);
     const QList<std::shared_ptr<Question>> &getQuestions() const { return m_questions; }
 
@@ -61,6 +64,7 @@ public:
 
 private:
     int m_maxAttempts = 1;
+    QString m_feedbackType = "detailed_with_answers";
     QList<std::shared_ptr<Question>> m_questions;
 };
 

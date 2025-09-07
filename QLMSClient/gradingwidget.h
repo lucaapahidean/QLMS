@@ -8,6 +8,7 @@ QT_BEGIN_NAMESPACE
 class QTableWidget;
 class QPushButton;
 class QDoubleSpinBox;
+class QLabel;
 QT_END_NAMESPACE
 
 class GradingWidget : public QWidget
@@ -25,11 +26,13 @@ private slots:
 private:
     void setupUi();
     void populateAttemptsTable(const QJsonArray &attempts);
+    void updateScoreInfo();
 
     QTableWidget *m_attemptsTable;
     QPushButton *m_refreshButton;
     QDoubleSpinBox *m_scoreSpinBox;
     QPushButton *m_submitGradeButton;
+    QLabel *m_scoreInfoLabel;
 };
 
 #endif // GRADINGWIDGET_H

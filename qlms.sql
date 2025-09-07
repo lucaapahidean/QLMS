@@ -26,7 +26,12 @@ CREATE TABLE text_lessons (
 
 CREATE TABLE quizzes (
     quiz_id INTEGER PRIMARY KEY REFERENCES course_materials(material_id) ON DELETE CASCADE,
-    max_attempts INTEGER NOT NULL DEFAULT 1
+    max_attempts INTEGER NOT NULL DEFAULT 1,
+    feedback_type VARCHAR(30) CHECK (feedback_type IN (
+        'detailed_with_answers',    -- Shows wrong/right + correct answers
+        'detailed_without_answers',  -- Shows wrong/right but not correct answers
+        'score_only'                -- Shows only the score
+    )) NOT NULL DEFAULT 'detailed_with_answers'
 );
 
 CREATE TABLE questions (
@@ -49,7 +54,13 @@ CREATE TABLE quiz_attempts (
     student_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     attempt_number INTEGER NOT NULL,
     status VARCHAR(30) CHECK (status IN ('completed', 'pending_manual_grading')) NOT NULL,
-    final_score FLOAT,
+    auto_score FLOAT,           -- Score from auto-graded questions
+    manual_score FLOAT,         -- Score from manually graded questions
+    final_score FLOAT,          -- Total score
+    total_auto_points INTEGER,  -- Total possible points from auto-graded questions
+    total_manual_points INTEGER,-- Total possible points from manual questions
+    submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    graded_at TIMESTAMP,
     UNIQUE(quiz_id, student_id, attempt_number)
 );
 
@@ -57,7 +68,10 @@ CREATE TABLE answers (
     answer_id SERIAL PRIMARY KEY,
     attempt_id INTEGER NOT NULL REFERENCES quiz_attempts(attempt_id) ON DELETE CASCADE,
     question_id INTEGER NOT NULL REFERENCES questions(question_id) ON DELETE CASCADE,
-    student_response TEXT
+    student_response TEXT,
+    is_correct BOOLEAN,         -- NULL for open_answer, TRUE/FALSE for auto-graded
+    points_earned FLOAT,        -- Points earned for this answer
+    max_points FLOAT            -- Maximum possible points for this question
 );
 
 -- Create indexes for better performance
@@ -65,3 +79,4 @@ CREATE INDEX idx_users_role ON users(role);
 CREATE INDEX idx_course_materials_type ON course_materials(type);
 CREATE INDEX idx_quiz_attempts_status ON quiz_attempts(status);
 CREATE INDEX idx_quiz_attempts_student ON quiz_attempts(student_id);
+CREATE INDEX idx_answers_attempt ON answers(attempt_id);
