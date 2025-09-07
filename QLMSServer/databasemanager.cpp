@@ -17,7 +17,6 @@ DatabaseManager &DatabaseManager::instance()
 
 DatabaseManager::DatabaseManager()
     : m_connectionPrefix("QLMSConnection")
-    , m_connectionCounter(0)
 {}
 
 DatabaseManager::~DatabaseManager()
@@ -54,10 +53,9 @@ bool DatabaseManager::initialize(const QString &host,
 
 QSqlDatabase DatabaseManager::getDatabase()
 {
-    QString connectionName = QString("%1_%2_%3")
+    QString connectionName = QString("%1_%2")
                                  .arg(m_connectionPrefix)
-                                 .arg(reinterpret_cast<quintptr>(QThread::currentThread()))
-                                 .arg(m_connectionCounter++);
+                                 .arg(reinterpret_cast<quintptr>(QThread::currentThread()));
 
     if (!QSqlDatabase::contains(connectionName)) {
         QSqlDatabase db = QSqlDatabase::addDatabase("QPSQL", connectionName);

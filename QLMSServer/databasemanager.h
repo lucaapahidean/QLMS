@@ -73,7 +73,6 @@ private:
     QString m_username;
     QString m_password;
     QMutex m_mutex;
-    int m_connectionCounter;
 };
 
 #endif // DATABASEMANAGER_H
