@@ -647,10 +647,43 @@ QJsonObject DatabaseManager::getQuizAttemptDetails(int attemptId, int studentId)
         if (query.exec()) {
             while (query.next()) {
                 QJsonObject answer;
-                answer["question_id"] = query.value("question_id").toInt();
+                int questionId = query.value("question_id").toInt();
+                QString questionType = query.value("question_type").toString();
+                QString studentResponse = query.value("student_response").toString();
+
+                answer["question_id"] = questionId;
                 answer["prompt"] = query.value("prompt").toString();
-                answer["question_type"] = query.value("question_type").toString();
-                answer["student_response"] = query.value("student_response").toString();
+                answer["question_type"] = questionType;
+                answer["student_response"] = studentResponse;
+
+                if (questionType == "radio" || questionType == "checkbox") {
+                    QSqlQuery optionsQuery(db);
+                    optionsQuery.prepare("SELECT option_text FROM question_options WHERE "
+                                         "question_id = :qid ORDER BY option_id");
+                    optionsQuery.bindValue(":qid", questionId);
+
+                    QStringList optionTexts;
+                    if (optionsQuery.exec()) {
+                        while (optionsQuery.next()) {
+                            optionTexts.append(optionsQuery.value(0).toString());
+                        }
+                    }
+
+                    QStringList responseText;
+                    QStringList responseIds = studentResponse.split(',');
+
+                    for (const QString &idStr : responseIds) {
+                        bool ok;
+                        int id = idStr.toInt(&ok);
+                        if (ok && id >= 0 && id < optionTexts.size()) {
+                            responseText.append(optionTexts[id]);
+                        }
+                    }
+                    answer["student_response_text"] = responseText.join(", ");
+
+                } else { // open_answer
+                    answer["student_response_text"] = studentResponse;
+                }
 
                 if (!query.value("is_correct").isNull()) {
                     answer["is_correct"] = query.value("is_correct").toBool();

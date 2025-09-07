@@ -22,7 +22,7 @@ public:
     void setPrompt(const QString &prompt) { m_prompt = prompt; }
 
     virtual QString getType() const = 0;
-    virtual QJsonObject toJson() const;
+    virtual QJsonObject toJson(bool includeAnswers = false) const;
     virtual bool validateAnswer(const QString &answer) const = 0;
 
 protected:
@@ -41,7 +41,7 @@ public:
     void addOption(const QString &text, bool isCorrect);
     const QList<QPair<QString, bool>> &getOptions() const { return m_options; }
 
-    QJsonObject toJson() const override;
+    QJsonObject toJson(bool includeAnswers = false) const override;
     bool validateAnswer(const QString &answer) const override;
 
 private:
@@ -58,7 +58,7 @@ public:
     void addOption(const QString &text, bool isCorrect);
     const QList<QPair<QString, bool>> &getOptions() const { return m_options; }
 
-    QJsonObject toJson() const override;
+    QJsonObject toJson(bool includeAnswers = false) const override;
     bool validateAnswer(const QString &answer) const override;
 
 private:
@@ -72,7 +72,7 @@ public:
 
     QString getType() const override { return "open_answer"; }
 
-    QJsonObject toJson() const override;
+    QJsonObject toJson(bool includeAnswers = false) const override;
     bool validateAnswer(const QString &answer) const override;
 };
 

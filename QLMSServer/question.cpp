@@ -8,8 +8,9 @@ Question::Question(int id, int quizId, const QString &prompt)
     , m_prompt(prompt)
 {}
 
-QJsonObject Question::toJson() const
+QJsonObject Question::toJson(bool includeAnswers) const
 {
+    Q_UNUSED(includeAnswers)
     QJsonObject obj;
     obj["question_id"] = m_id;
     obj["quiz_id"] = m_quizId;
@@ -27,14 +28,16 @@ void CheckboxQuestion::addOption(const QString &text, bool isCorrect)
     m_options.append(qMakePair(text, isCorrect));
 }
 
-QJsonObject CheckboxQuestion::toJson() const
+QJsonObject CheckboxQuestion::toJson(bool includeAnswers) const
 {
-    QJsonObject obj = Question::toJson();
+    QJsonObject obj = Question::toJson(includeAnswers);
     QJsonArray optionsArray;
     for (const auto &option : m_options) {
         QJsonObject optionObj;
         optionObj["text"] = option.first;
-        optionObj["is_correct"] = option.second;
+        if (includeAnswers) {
+            optionObj["is_correct"] = option.second;
+        }
         optionsArray.append(optionObj);
     }
     obj["options"] = optionsArray;
@@ -70,14 +73,16 @@ void RadioButtonQuestion::addOption(const QString &text, bool isCorrect)
     m_options.append(qMakePair(text, isCorrect));
 }
 
-QJsonObject RadioButtonQuestion::toJson() const
+QJsonObject RadioButtonQuestion::toJson(bool includeAnswers) const
 {
-    QJsonObject obj = Question::toJson();
+    QJsonObject obj = Question::toJson(includeAnswers);
     QJsonArray optionsArray;
     for (const auto &option : m_options) {
         QJsonObject optionObj;
         optionObj["text"] = option.first;
-        optionObj["is_correct"] = option.second;
+        if (includeAnswers) {
+            optionObj["is_correct"] = option.second;
+        }
         optionsArray.append(optionObj);
     }
     obj["options"] = optionsArray;
@@ -98,9 +103,9 @@ OpenAnswerQuestion::OpenAnswerQuestion(int id, int quizId, const QString &prompt
     : Question(id, quizId, prompt)
 {}
 
-QJsonObject OpenAnswerQuestion::toJson() const
+QJsonObject OpenAnswerQuestion::toJson(bool includeAnswers) const
 {
-    return Question::toJson();
+    return Question::toJson(includeAnswers);
 }
 
 bool OpenAnswerQuestion::validateAnswer(const QString &answer) const

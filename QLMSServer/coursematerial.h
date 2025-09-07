@@ -21,7 +21,7 @@ public:
     void setTitle(const QString &title) { m_title = title; }
 
     virtual QString getType() const = 0;
-    virtual QJsonObject toJson() const;
+    virtual QJsonObject toJson(bool includeAnswers = false) const;
 
 protected:
     int m_id;
@@ -38,7 +38,7 @@ public:
     QString getContent() const { return m_content; }
     void setContent(const QString &content) { m_content = content; }
 
-    QJsonObject toJson() const override;
+    QJsonObject toJson(bool includeAnswers = false) const override;
 
 private:
     QString m_content;
@@ -60,7 +60,7 @@ public:
     void addQuestion(std::shared_ptr<Question> question);
     const QList<std::shared_ptr<Question>> &getQuestions() const { return m_questions; }
 
-    QJsonObject toJson() const override;
+    QJsonObject toJson(bool includeAnswers = false) const override;
 
 private:
     int m_maxAttempts = 1;

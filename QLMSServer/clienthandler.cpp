@@ -132,7 +132,7 @@ void ClientHandler::handleLogin(const QJsonObject &data)
     QString username = data["username"].toString();
     QString password = data["password"].toString();
 
-    // Hash the password (in production, use proper salting and stronger hashing)
+    // Hash the password
     QByteArray hash = QCryptographicHash::hash(password.toUtf8(), QCryptographicHash::Sha256);
     QString passwordHash = QString(hash.toHex());
 
@@ -246,7 +246,7 @@ void ClientHandler::handleGetMaterials()
     auto materials = DatabaseManager::instance().getAllMaterials();
     QJsonArray materialsArray;
     for (const auto &material : materials) {
-        materialsArray.append(material->toJson());
+        materialsArray.append(material->toJson(false)); // Pass false to exclude answers
     }
 
     QJsonObject response;
@@ -333,9 +333,6 @@ void ClientHandler::handleStartQuiz(const QJsonObject &data)
 
     int quizId = data["quiz_id"].toInt();
 
-    // Check attempt count
-    int attemptCount = DatabaseManager::instance().getAttemptCount(quizId, m_currentUser->getId());
-
     // Get quiz details
     auto quiz = DatabaseManager::instance().getMaterialById(quizId);
     if (!quiz || quiz->getType() != "quiz") {
@@ -346,9 +343,20 @@ void ClientHandler::handleStartQuiz(const QJsonObject &data)
         return;
     }
 
+    // Check attempt count
+    int attemptCount = DatabaseManager::instance().getAttemptCount(quizId, m_currentUser->getId());
+    auto quizPtr = std::dynamic_pointer_cast<Quiz>(quiz);
+    if (quizPtr && attemptCount >= quizPtr->getMaxAttempts()) {
+        QJsonObject response;
+        response["type"] = "ERROR";
+        response["message"] = "You have reached the maximum number of attempts for this quiz.";
+        sendResponse(response);
+        return;
+    }
+
     QJsonObject response;
     response["type"] = "DATA_RESPONSE";
-    response["data"] = quiz->toJson();
+    response["data"] = quiz->toJson(false); // Pass false to exclude answers
     sendResponse(response);
 }
 

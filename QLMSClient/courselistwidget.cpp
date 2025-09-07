@@ -301,7 +301,7 @@ void CourseListWidget::handleQuizDataResponse(const QJsonObject &response)
         m_currentQuiz = response["data"].toObject();
         displayQuiz(m_currentQuiz);
     } else {
-        QMessageBox::critical(this, "Error", "Failed to load quiz");
+        QMessageBox::critical(this, "Error", response["message"].toString("Failed to load quiz"));
     }
 }
 
@@ -499,7 +499,11 @@ void CourseListWidget::displayAttemptDetails(const QJsonObject &attemptData)
         for (int i = 0; i < answers.size(); ++i) {
             QJsonObject answer = answers[i].toObject();
             detailsText += QString("Question %1: %2\n").arg(i + 1).arg(answer["prompt"].toString());
-            detailsText += QString("Your answer: %1\n").arg(answer["student_response"].toString());
+
+            QString responseToDisplay = answer.contains("student_response_text")
+                                            ? answer["student_response_text"].toString()
+                                            : answer["student_response"].toString();
+            detailsText += QString("Your answer: %1\n").arg(responseToDisplay);
 
             if (!answer["is_correct"].isNull()) {
                 bool correct = answer["is_correct"].toBool();
