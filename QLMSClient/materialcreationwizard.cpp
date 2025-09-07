@@ -41,7 +41,10 @@ void MaterialCreationWizard::sendDataToServer()
 
     if (field("isLesson").toBool()) {
         data["title"] = field("lesson.title").toString();
-        data["content"] = field("lesson.content").toString();
+        LessonPage *lp = qobject_cast<LessonPage *>(page(Page_Lesson));
+        if (lp) {
+            data["content"] = lp->content();
+        }
         NetworkManager::instance()
             .sendCommand("CREATE_LESSON", data, [](const QJsonObject &response) {
                 if (response["type"].toString() != "OK") {
@@ -99,20 +102,24 @@ LessonPage::LessonPage(QWidget *parent)
 
     auto *layout = new QFormLayout(this);
     auto *titleEdit = new QLineEdit(this);
-    auto *contentEdit = new QTextEdit(this);
+    m_contentEdit = new QTextEdit(this);
 
     layout->addRow("Title:", titleEdit);
-    layout->addRow("Content:", contentEdit);
+    layout->addRow("Content:", m_contentEdit);
 
     registerField("lesson.title*", titleEdit);
-    registerField("lesson.content*", contentEdit);
 
-    connect(contentEdit, &QTextEdit::textChanged, this, &QWizardPage::completeChanged);
+    connect(titleEdit, &QLineEdit::textChanged, this, &QWizardPage::completeChanged);
 }
 
 int LessonPage::nextId() const
 {
     return MaterialCreationWizard::Page_Conclusion;
+}
+
+QString LessonPage::content() const
+{
+    return m_contentEdit->toPlainText();
 }
 
 // --- Quiz Page ---
@@ -185,7 +192,9 @@ QuestionsPage::QuestionsPage(QWidget *parent)
     auto *typeLayout = new QHBoxLayout();
     typeLayout->addWidget(new QLabel("Question Type:", this));
     m_questionTypeCombo = new QComboBox(this);
-    m_questionTypeCombo->addItems(QStringList() << "radio" << "checkbox" << "open_answer");
+    m_questionTypeCombo->addItems(QStringList() << "radio"
+                                                << "checkbox"
+                                                << "open_answer");
     typeLayout->addWidget(m_questionTypeCombo);
     typeLayout->addStretch();
     rightLayout->addLayout(typeLayout);
@@ -193,7 +202,8 @@ QuestionsPage::QuestionsPage(QWidget *parent)
     // Options table for multiple choice questions
     rightLayout->addWidget(new QLabel("Options (for multiple choice):", this));
     m_optionsTable = new QTableWidget(0, 2, this);
-    m_optionsTable->setHorizontalHeaderLabels(QStringList() << "Option Text" << "Is Correct");
+    m_optionsTable->setHorizontalHeaderLabels(QStringList() << "Option Text"
+                                                            << "Is Correct");
     m_optionsTable->horizontalHeader()->setStretchLastSection(true);
     m_optionsTable->setMaximumHeight(150);
     rightLayout->addWidget(m_optionsTable);

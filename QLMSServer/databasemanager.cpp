@@ -846,7 +846,7 @@ QJsonArray DatabaseManager::getPendingAttempts()
         obj["quiz_id"] = query.value("quiz_id").toInt();
         obj["student_id"] = query.value("student_id").toInt();
         obj["attempt_number"] = query.value("attempt_number").toInt();
-        obj["student__name"] = query.value("username").toString();
+        obj["student_name"] = query.value("username").toString();
         obj["quiz_title"] = query.value("title").toString();
         obj["auto_score"] = query.value("auto_score").toDouble();
         obj["total_auto_points"] = query.value("total_auto_points").toInt();

@@ -44,6 +44,10 @@ class LessonPage : public QWizardPage
 public:
     LessonPage(QWidget *parent = nullptr);
     int nextId() const override;
+    QString content() const;
+
+private:
+    QTextEdit *m_contentEdit;
 };
 
 class QuizPage : public QWizardPage

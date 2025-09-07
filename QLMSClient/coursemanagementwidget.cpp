@@ -99,16 +99,23 @@ void CourseManagementWidget::onMaterialSelected()
         return;
 
     QJsonObject material = m_materials[row].toObject();
-    int materialId = material["material_id"].toInt();
+    QString type = material["type"].toString();
 
-    QJsonObject data;
-    data["material_id"] = materialId;
-
-    NetworkManager::instance().sendCommand("GET_MATERIAL_DETAILS",
-                                           data,
-                                           [this](const QJsonObject &response) {
-                                               handleMaterialDetailsResponse(response);
-                                           });
+    if (type == "lesson") {
+        // For lessons, the content is already available from the GET_MATERIALS call.
+        // No need to make another network request.
+        displayLesson(material);
+    } else if (type == "quiz") {
+        // For quizzes, we fetch details to get correct answers for the instructor view.
+        int materialId = material["material_id"].toInt();
+        QJsonObject data;
+        data["material_id"] = materialId;
+        NetworkManager::instance().sendCommand("GET_MATERIAL_DETAILS",
+                                               data,
+                                               [this](const QJsonObject &response) {
+                                                   handleMaterialDetailsResponse(response);
+                                               });
+    }
 }
 
 void CourseManagementWidget::onDeleteMaterial()
