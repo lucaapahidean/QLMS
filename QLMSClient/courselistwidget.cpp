@@ -308,31 +308,14 @@ void CourseListWidget::handleQuizDataResponse(const QJsonObject &response)
 void CourseListWidget::handleQuizSubmissionResponse(const QJsonObject &response)
 {
     if (response["type"].toString() == "OK") {
-        QString feedbackType = response["feedback_type"].toString();
-        bool hasOpenAnswers = response["has_open_answers"].toBool();
-        float autoScore = response["auto_score"].toDouble();
+        QMessageBox::information(this,
+                                 "Success",
+                                 "Quiz submitted successfully! "
+                                 "Check the Quiz History tab to review your attempt.");
 
-        QString message;
-        if (feedbackType == "score_only") {
-            if (hasOpenAnswers) {
-                message = QString("Quiz submitted successfully!\n\n"
-                                  "Auto-graded score: %1%\n"
-                                  "Some questions require manual grading.")
-                              .arg(autoScore, 0, 'f', 1);
-            } else {
-                message = QString("Quiz submitted successfully!\n\n"
-                                  "Final score: %1%")
-                              .arg(autoScore, 0, 'f', 1);
-            }
-        } else {
-            // For detailed feedback, redirect to the quiz history tab
-            message
-                = "Quiz submitted successfully! Check the Quiz History tab to review your answers.";
-            onRefreshAttempts();
-            m_tabWidget->setCurrentIndex(1); // Switch to Quiz History tab
-        }
+        onRefreshAttempts();
+        m_tabWidget->setCurrentIndex(1); // Switch to Quiz History tab
 
-        QMessageBox::information(this, "Success", message);
         clearContentArea();
         m_contentGroup->setTitle("Select a material");
     } else {
