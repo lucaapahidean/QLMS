@@ -15,11 +15,12 @@ qt_add_executable(QLMSClient
     basedashboardwindow.h basedashboardwindow.cpp
     usermanagementwidget.h usermanagementwidget.cpp
     admindashboard.h admindashboard.cpp
-    courseeditorwidget.h courseeditorwidget.cpp
     gradingwidget.h gradingwidget.cpp
     instructordashboard.h instructordashboard.cpp
     courselistwidget.h courselistwidget.cpp
     studentdashboard.h studentdashboard.cpp
+    coursemanagementwidget.h coursemanagementwidget.cpp
+    materialcreationwizard.h materialcreationwizard.cpp
 )
 
 target_link_libraries(QLMSClient

@@ -86,16 +86,20 @@ void ClientHandler::processMessage(const QJsonObject &message)
         response["type"] = "ERROR";
         response["message"] = "Not authenticated";
         sendResponse(response);
+    } else if (command == "GET_MATERIAL_DETAILS") {
+        handleGetMaterialDetails(data);
+    } else if (command == "DELETE_MATERIAL") {
+        handleDeleteMaterial(data);
+    } else if (command == "CREATE_LESSON") {
+        handleCreateLesson(data);
+    } else if (command == "CREATE_QUIZ_WITH_QUESTIONS") {
+        handleCreateQuizWithQuestions(data);
     } else if (command == "CREATE_USER") {
         handleCreateUser(data);
     } else if (command == "DELETE_USER") {
         handleDeleteUser(data);
     } else if (command == "GET_ALL_USERS") {
         handleGetAllUsers();
-    } else if (command == "CREATE_QUIZ") {
-        handleCreateQuiz(data);
-    } else if (command == "ADD_QUESTION") {
-        handleAddQuestion(data);
     } else if (command == "START_QUIZ") {
         handleStartQuiz(data);
     } else if (command == "FINISH_ATTEMPT") {
@@ -255,7 +259,49 @@ void ClientHandler::handleGetMaterials()
     sendResponse(response);
 }
 
-void ClientHandler::handleCreateQuiz(const QJsonObject &data)
+void ClientHandler::handleGetMaterialDetails(const QJsonObject &data)
+{
+    int materialId = data["material_id"].toInt();
+    auto material = DatabaseManager::instance().getMaterialById(materialId);
+
+    if (material) {
+        QJsonObject response;
+        response["type"] = "DATA_RESPONSE";
+        response["data"] = material->toJson(true); // Include answers for instructor
+        sendResponse(response);
+    } else {
+        QJsonObject response;
+        response["type"] = "ERROR";
+        response["message"] = "Material not found";
+        sendResponse(response);
+    }
+}
+
+void ClientHandler::handleDeleteMaterial(const QJsonObject &data)
+{
+    if (!m_currentUser || m_currentUser->getRole() != "instructor") {
+        QJsonObject response;
+        response["type"] = "ERROR";
+        response["message"] = "Unauthorized";
+        sendResponse(response);
+        return;
+    }
+
+    int materialId = data["material_id"].toInt();
+    bool success = DatabaseManager::instance().deleteMaterial(materialId);
+
+    QJsonObject response;
+    if (success) {
+        response["type"] = "OK";
+        response["message"] = "Material deleted successfully";
+    } else {
+        response["type"] = "ERROR";
+        response["message"] = "Failed to delete material";
+    }
+    sendResponse(response);
+}
+
+void ClientHandler::handleCreateLesson(const QJsonObject &data)
 {
     if (!m_currentUser || m_currentUser->getRole() != "instructor") {
         QJsonObject response;
@@ -266,24 +312,22 @@ void ClientHandler::handleCreateQuiz(const QJsonObject &data)
     }
 
     QString title = data["title"].toString();
-    int maxAttempts = data["max_attempts"].toInt(1);
-    QString feedbackType = data["feedback_type"].toString("detailed_with_answers");
+    QString content = data["content"].toString();
 
-    int quizId = DatabaseManager::instance().createQuiz(title, maxAttempts, feedbackType);
+    bool success = DatabaseManager::instance().createLesson(title, content);
 
     QJsonObject response;
-    if (quizId > 0) {
+    if (success) {
         response["type"] = "OK";
-        response["quiz_id"] = quizId;
-        response["message"] = "Quiz created successfully";
+        response["message"] = "Lesson created successfully";
     } else {
         response["type"] = "ERROR";
-        response["message"] = "Failed to create quiz";
+        response["message"] = "Failed to create lesson";
     }
     sendResponse(response);
 }
 
-void ClientHandler::handleAddQuestion(const QJsonObject &data)
+void ClientHandler::handleCreateQuizWithQuestions(const QJsonObject &data)
 {
     if (!m_currentUser || m_currentUser->getRole() != "instructor") {
         QJsonObject response;
@@ -293,30 +337,15 @@ void ClientHandler::handleAddQuestion(const QJsonObject &data)
         return;
     }
 
-    int quizId = data["quiz_id"].toInt();
-    QString prompt = data["prompt"].toString();
-    QString questionType = data["question_type"].toString();
-
-    int questionId = DatabaseManager::instance().addQuestion(quizId, prompt, questionType);
-
-    if (questionId > 0 && data.contains("options")) {
-        QJsonArray options = data["options"].toArray();
-        for (const QJsonValue &val : options) {
-            QJsonObject option = val.toObject();
-            DatabaseManager::instance().addQuestionOption(questionId,
-                                                          option["text"].toString(),
-                                                          option["is_correct"].toBool());
-        }
-    }
+    bool success = DatabaseManager::instance().createQuizWithQuestions(data);
 
     QJsonObject response;
-    if (questionId > 0) {
+    if (success) {
         response["type"] = "OK";
-        response["question_id"] = questionId;
-        response["message"] = "Question added successfully";
+        response["message"] = "Quiz created successfully";
     } else {
         response["type"] = "ERROR";
-        response["message"] = "Failed to add question";
+        response["message"] = "Failed to create quiz";
     }
     sendResponse(response);
 }

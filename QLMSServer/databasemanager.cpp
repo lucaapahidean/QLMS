@@ -231,6 +231,20 @@ std::shared_ptr<CourseMaterial> DatabaseManager::getMaterialById(int materialId)
     return createMaterialFromQuery(query, db);
 }
 
+bool DatabaseManager::deleteMaterial(int materialId)
+{
+    QMutexLocker locker(&m_mutex);
+    QSqlDatabase db = getDatabase();
+    if (!db.open())
+        return false;
+
+    QSqlQuery query(db);
+    query.prepare("DELETE FROM course_materials WHERE material_id = :id");
+    query.bindValue(":id", materialId);
+
+    return query.exec();
+}
+
 std::shared_ptr<CourseMaterial> DatabaseManager::createMaterialFromQuery(const QSqlQuery &query,
                                                                          QSqlDatabase &db)
 {
@@ -340,85 +354,108 @@ std::shared_ptr<Question> DatabaseManager::createQuestionFromQuery(const QSqlQue
     return question;
 }
 
-int DatabaseManager::createQuiz(const QString &title, int maxAttempts, const QString &feedbackType)
-{
-    QMutexLocker locker(&m_mutex);
-    QSqlDatabase db = getDatabase();
-    if (!db.open())
-        return -1;
-
-    db.transaction();
-
-    QSqlQuery query(db);
-    query.prepare(
-        "INSERT INTO course_materials (title, type) VALUES (:title, 'quiz') RETURNING material_id");
-    query.bindValue(":title", title);
-
-    if (!query.exec()) {
-        qCritical() << "Failed to insert course material:" << query.lastError().text();
-        db.rollback();
-        return -1;
-    }
-
-    if (!query.next()) {
-        qCritical() << "Failed to get material_id from INSERT";
-        db.rollback();
-        return -1;
-    }
-
-    int materialId = query.value(0).toInt();
-
-    query.prepare("INSERT INTO quizzes (quiz_id, max_attempts, feedback_type) VALUES (:id, "
-                  ":attempts, :feedback)");
-    query.bindValue(":id", materialId);
-    query.bindValue(":attempts", maxAttempts);
-    query.bindValue(":feedback", feedbackType);
-
-    if (!query.exec()) {
-        db.rollback();
-        return -1;
-    }
-
-    db.commit();
-    return materialId;
-}
-
-int DatabaseManager::addQuestion(int quizId, const QString &prompt, const QString &questionType)
-{
-    QMutexLocker locker(&m_mutex);
-    QSqlDatabase db = getDatabase();
-    if (!db.open())
-        return -1;
-
-    QSqlQuery query(db);
-    query.prepare("INSERT INTO questions (quiz_id, prompt, question_type) "
-                  "VALUES (:quiz_id, :prompt, :type) RETURNING question_id");
-    query.bindValue(":quiz_id", quizId);
-    query.bindValue(":prompt", prompt);
-    query.bindValue(":type", questionType);
-
-    if (!query.exec() || !query.next()) {
-        return -1;
-    }
-
-    return query.value(0).toInt();
-}
-
-bool DatabaseManager::addQuestionOption(int questionId, const QString &text, bool isCorrect)
+bool DatabaseManager::createLesson(const QString &title, const QString &content)
 {
     QMutexLocker locker(&m_mutex);
     QSqlDatabase db = getDatabase();
     if (!db.open())
         return false;
 
-    QSqlQuery query(db);
-    query.prepare("INSERT INTO question_options (question_id, option_text, is_correct) "
-                  "VALUES (:question_id, :text, :correct)");
-    query.bindValue(":question_id", questionId);
-    query.bindValue(":text", text);
-    query.bindValue(":correct", isCorrect);
+    db.transaction();
 
-    return query.exec();
+    QSqlQuery query(db);
+    query.prepare("INSERT INTO course_materials (title, type) VALUES (:title, 'lesson') RETURNING "
+                  "material_id");
+    query.bindValue(":title", title);
+
+    if (!query.exec() || !query.next()) {
+        db.rollback();
+        return false;
+    }
+
+    int materialId = query.value(0).toInt();
+
+    query.prepare("INSERT INTO text_lessons (lesson_id, content) VALUES (:id, :content)");
+    query.bindValue(":id", materialId);
+    query.bindValue(":content", content);
+
+    if (!query.exec()) {
+        db.rollback();
+        return false;
+    }
+
+    return db.commit();
+}
+
+bool DatabaseManager::createQuizWithQuestions(const QJsonObject &quizData)
+{
+    QMutexLocker locker(&m_mutex);
+    QSqlDatabase db = getDatabase();
+    if (!db.open())
+        return false;
+
+    db.transaction();
+
+    // 1. Create course_material entry
+    QSqlQuery query(db);
+    query.prepare(
+        "INSERT INTO course_materials (title, type) VALUES (:title, 'quiz') RETURNING material_id");
+    query.bindValue(":title", quizData["title"].toString());
+
+    if (!query.exec() || !query.next()) {
+        db.rollback();
+        return false;
+    }
+    int quizId = query.value(0).toInt();
+
+    // 2. Create quizzes entry
+    query.prepare("INSERT INTO quizzes (quiz_id, max_attempts, feedback_type) VALUES (:id, "
+                  ":attempts, :feedback)");
+    query.bindValue(":id", quizId);
+    query.bindValue(":attempts", quizData["max_attempts"].toInt());
+    query.bindValue(":feedback", quizData["feedback_type"].toString());
+
+    if (!query.exec()) {
+        db.rollback();
+        return false;
+    }
+
+    // 3. Create questions and options
+    QJsonArray questions = quizData["questions"].toArray();
+    for (const QJsonValue &qVal : questions) {
+        QJsonObject qObj = qVal.toObject();
+
+        query.prepare("INSERT INTO questions (quiz_id, prompt, question_type) VALUES (:quiz_id, "
+                      ":prompt, :type) RETURNING question_id");
+        query.bindValue(":quiz_id", quizId);
+        query.bindValue(":prompt", qObj["prompt"].toString());
+        query.bindValue(":type", qObj["question_type"].toString());
+
+        if (!query.exec() || !query.next()) {
+            db.rollback();
+            return false;
+        }
+        int questionId = query.value(0).toInt();
+
+        if (qObj.contains("options")) {
+            QJsonArray options = qObj["options"].toArray();
+            for (const QJsonValue &oVal : options) {
+                QJsonObject oObj = oVal.toObject();
+                query.prepare("INSERT INTO question_options (question_id, option_text, is_correct) "
+                              "VALUES (:q_id, :text, :correct)");
+                query.bindValue(":q_id", questionId);
+                query.bindValue(":text", oObj["text"].toString());
+                query.bindValue(":correct", oObj["is_correct"].toBool());
+
+                if (!query.exec()) {
+                    db.rollback();
+                    return false;
+                }
+            }
+        }
+    }
+
+    return db.commit();
 }
 
 int DatabaseManager::createQuizAttempt(int quizId, int studentId, int attemptNumber)
@@ -608,11 +645,12 @@ QJsonObject DatabaseManager::getQuizAttemptDetails(int attemptId, int studentId)
 
     // Get attempt info
     QSqlQuery query(db);
-    query.prepare("SELECT qa.*, q.feedback_type, cm.title "
-                  "FROM quiz_attempts qa "
-                  "JOIN quizzes q ON qa.quiz_id = q.quiz_id "
-                  "JOIN course_materials cm ON qa.quiz_id = cm.material_id "
-                  "WHERE qa.attempt_id = :attempt_id AND qa.student_id = :student_id");
+    query.prepare(
+        "SELECT qa.*, q.feedback_type, cm.title "
+        "FROM quiz_attempts qa "
+        "JOIN quizzes q ON qa.quiz_id = q.quiz_id "
+        "JOIN course_materials cm ON qa.quiz_id = cm.material_id "
+        "WHERE qa.attempt_id = :attempt_id AND (qa.student_id = :student_id OR :student_id = -1)");
     query.bindValue(":attempt_id", attemptId);
     query.bindValue(":student_id", studentId);
 
@@ -635,7 +673,7 @@ QJsonObject DatabaseManager::getQuizAttemptDetails(int attemptId, int studentId)
     QString feedbackType = query.value("feedback_type").toString();
     QString status = query.value("status").toString();
 
-    if (feedbackType != "score_only") {
+    if (feedbackType != "score_only" || studentId == -1) {
         QJsonArray answersArray;
 
         query.prepare("SELECT a.*, q.prompt, q.question_type "
@@ -694,7 +732,7 @@ QJsonObject DatabaseManager::getQuizAttemptDetails(int attemptId, int studentId)
                     answer["points_earned"] = query.value("points_earned").toDouble();
                 }
                 // Include correct answers only if feedback type is "detailed_with_answers"
-                if (feedbackType == "detailed_with_answers"
+                if ((feedbackType == "detailed_with_answers" || studentId == -1)
                     && query.value("question_type").toString() != "open_answer") {
                     QSqlQuery optionsQuery(db);
                     optionsQuery.prepare("SELECT option_text FROM question_options "
@@ -808,7 +846,7 @@ QJsonArray DatabaseManager::getPendingAttempts()
         obj["quiz_id"] = query.value("quiz_id").toInt();
         obj["student_id"] = query.value("student_id").toInt();
         obj["attempt_number"] = query.value("attempt_number").toInt();
-        obj["student_name"] = query.value("username").toString();
+        obj["student__name"] = query.value("username").toString();
         obj["quiz_title"] = query.value("title").toString();
         obj["auto_score"] = query.value("auto_score").toDouble();
         obj["total_auto_points"] = query.value("total_auto_points").toInt();

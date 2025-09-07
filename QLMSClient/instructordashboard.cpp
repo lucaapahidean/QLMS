@@ -1,5 +1,5 @@
 #include "instructordashboard.h"
-#include "courseeditorwidget.h"
+#include "coursemanagementwidget.h"
 #include "gradingwidget.h"
 #include <QTabWidget>
 
@@ -10,8 +10,8 @@ InstructorDashboard::InstructorDashboard(const QString &username, int userId, QW
 
     auto *tabWidget = new QTabWidget(this);
 
-    auto *courseEditor = new CourseEditorWidget(this);
-    tabWidget->addTab(courseEditor, "Course Editor");
+    auto *courseManagement = new CourseManagementWidget(this);
+    tabWidget->addTab(courseManagement, "Course Management");
 
     auto *gradingWidget = new GradingWidget(this);
     tabWidget->addTab(gradingWidget, "Grading");

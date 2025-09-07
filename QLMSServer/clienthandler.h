@@ -39,14 +39,14 @@ private:
     void handleDeleteUser(const QJsonObject &data);
     void handleGetAllUsers();
     void handleGetMaterials();
-    void handleCreateQuiz(const QJsonObject &data);
-    void handleAddQuestion(const QJsonObject &data);
+    void handleGetMaterialDetails(const QJsonObject &data);
+    void handleDeleteMaterial(const QJsonObject &data);
+    void handleCreateLesson(const QJsonObject &data);
+    void handleCreateQuizWithQuestions(const QJsonObject &data);
     void handleStartQuiz(const QJsonObject &data);
     void handleFinishAttempt(const QJsonObject &data);
     void handleGetPendingAttempts();
     void handleSubmitGrade(const QJsonObject &data);
-
-    // New handlers for quiz history
     void handleGetMyAttempts();
     void handleGetAttemptDetails(const QJsonObject &data);
 

@@ -2,6 +2,7 @@
 #define DATABASEMANAGER_H
 
 #include <memory>
+#include <QJsonObject>
 #include <QMutex>
 #include <QObject>
 #include <QSqlDatabase>
@@ -34,11 +35,9 @@ public:
     // Course material operations
     QList<std::shared_ptr<CourseMaterial>> getAllMaterials();
     std::shared_ptr<CourseMaterial> getMaterialById(int materialId);
-    int createQuiz(const QString &title,
-                   int maxAttempts,
-                   const QString &feedbackType = "detailed_with_answers");
-    int addQuestion(int quizId, const QString &prompt, const QString &questionType);
-    bool addQuestionOption(int questionId, const QString &text, bool isCorrect);
+    bool deleteMaterial(int materialId);
+    bool createLesson(const QString &title, const QString &content);
+    bool createQuizWithQuestions(const QJsonObject &quizData);
 
     // Quiz attempt operations
     int createQuizAttempt(int quizId, int studentId, int attemptNumber);
@@ -48,8 +47,6 @@ public:
     QJsonArray getPendingAttempts();
     bool submitGrade(int attemptId, float manualScore);
     int getAttemptCount(int quizId, int studentId);
-
-    // New methods for quiz history and attempt details
     QJsonArray getStudentQuizAttempts(int studentId);
     QJsonObject getQuizAttemptDetails(int attemptId, int studentId = -1);
 
