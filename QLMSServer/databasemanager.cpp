@@ -633,6 +633,7 @@ QJsonObject DatabaseManager::getQuizAttemptDetails(int attemptId, int studentId)
 
     // Get detailed answers if feedback type allows it
     QString feedbackType = query.value("feedback_type").toString();
+    QString status = query.value("status").toString();
 
     if (feedbackType != "score_only") {
         QJsonArray answersArray;
@@ -689,6 +690,9 @@ QJsonObject DatabaseManager::getQuizAttemptDetails(int attemptId, int studentId)
                     answer["is_correct"] = query.value("is_correct").toBool();
                 }
 
+                if (questionType == "open_answer" && status == "completed") {
+                    answer["points_earned"] = query.value("points_earned").toDouble();
+                }
                 // Include correct answers only if feedback type is "detailed_with_answers"
                 if (feedbackType == "detailed_with_answers"
                     && query.value("question_type").toString() != "open_answer") {
@@ -799,7 +803,8 @@ QJsonArray DatabaseManager::getPendingAttempts()
 
     while (query.next()) {
         QJsonObject obj;
-        obj["attempt_id"] = query.value("attempt_id").toInt();
+        int attemptId = query.value("attempt_id").toInt();
+        obj["attempt_id"] = attemptId;
         obj["quiz_id"] = query.value("quiz_id").toInt();
         obj["student_id"] = query.value("student_id").toInt();
         obj["attempt_number"] = query.value("attempt_number").toInt();
@@ -808,6 +813,25 @@ QJsonArray DatabaseManager::getPendingAttempts()
         obj["auto_score"] = query.value("auto_score").toDouble();
         obj["total_auto_points"] = query.value("total_auto_points").toInt();
         obj["total_manual_points"] = query.value("total_manual_points").toInt();
+
+        QJsonArray questionsArray;
+        QSqlQuery questionsQuery(db);
+        questionsQuery.prepare(
+            "SELECT q.prompt, a.student_response FROM answers a "
+            "JOIN questions q ON a.question_id = q.question_id "
+            "WHERE a.attempt_id = :attempt_id AND q.question_type = 'open_answer'");
+        questionsQuery.bindValue(":attempt_id", attemptId);
+
+        if (questionsQuery.exec()) {
+            while (questionsQuery.next()) {
+                QJsonObject qObj;
+                qObj["prompt"] = questionsQuery.value("prompt").toString();
+                qObj["student_response"] = questionsQuery.value("student_response").toString();
+                questionsArray.append(qObj);
+            }
+        }
+        obj["questions"] = questionsArray;
+
         attempts.append(obj);
     }
 
@@ -861,6 +885,15 @@ bool DatabaseManager::submitGrade(int attemptId, float manualScore)
         db.rollback();
         return false;
     }
+
+    // Update points_earned for open answer questions
+    query.prepare(
+        "UPDATE answers SET points_earned = :points "
+        "WHERE attempt_id = :attempt_id AND question_id IN (SELECT question_id FROM questions "
+        "WHERE question_type = 'open_answer')");
+    query.bindValue(":points", manualScore / 100.0);
+    query.bindValue(":attempt_id", attemptId);
+    query.exec();
 
     db.commit();
     return true;

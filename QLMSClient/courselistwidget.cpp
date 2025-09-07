@@ -505,7 +505,12 @@ void CourseListWidget::displayAttemptDetails(const QJsonObject &attemptData)
                     }
                 }
             } else if (answer["question_type"].toString() == "open_answer") {
-                detailsText += "Result: Pending manual grading\n";
+                if (status == "completed") {
+                    detailsText += QString("Score: %1%\n")
+                                       .arg(answer["points_earned"].toDouble() * 100, 0, 'f', 2);
+                } else {
+                    detailsText += "Result: Pending manual grading\n";
+                }
             }
 
             detailsText += "\n";

@@ -8,6 +8,7 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QTableWidget>
+#include <QTextEdit>
 #include <QVBoxLayout>
 
 GradingWidget::GradingWidget(QWidget *parent)
@@ -57,6 +58,10 @@ void GradingWidget::setupUi()
     m_scoreInfoLabel->setWordWrap(true);
     scoreInfoLayout->addWidget(m_scoreInfoLabel);
 
+    m_questionAnswerTextEdit = new QTextEdit(this);
+    m_questionAnswerTextEdit->setReadOnly(true);
+    scoreInfoLayout->addWidget(m_questionAnswerTextEdit);
+
     mainLayout->addWidget(scoreInfoGroup);
 
     // Grading controls
@@ -92,6 +97,7 @@ void GradingWidget::setupUi()
             updateScoreInfo();
         } else {
             m_scoreInfoLabel->clear();
+            m_questionAnswerTextEdit->clear();
         }
     });
 }
@@ -102,6 +108,7 @@ void GradingWidget::updateScoreInfo()
     if (row < 0)
         return;
 
+    QJsonObject attempt = m_pendingAttempts[row].toObject();
     QString autoScore = m_attemptsTable->item(row, 4)->text();
     QString openQuestions = m_attemptsTable->item(row, 5)->text();
     QString studentName = m_attemptsTable->item(row, 1)->text();
@@ -116,6 +123,15 @@ void GradingWidget::updateScoreInfo()
                        .arg(openQuestions);
 
     m_scoreInfoLabel->setText(info);
+
+    QJsonArray questions = attempt["questions"].toArray();
+    QString qaText;
+    for (const QJsonValue &value : questions) {
+        QJsonObject question = value.toObject();
+        qaText += "Question:\n" + question["prompt"].toString() + "\n\n";
+        qaText += "Student's Answer:\n" + question["student_response"].toString() + "\n\n";
+    }
+    m_questionAnswerTextEdit->setPlainText(qaText);
 }
 
 void GradingWidget::onRefreshPendingAttempts()
@@ -160,6 +176,7 @@ void GradingWidget::onSubmitGrade()
                     QMessageBox::information(this, "Success", "Grade submitted successfully");
                     onRefreshPendingAttempts();
                     m_scoreInfoLabel->clear();
+                    m_questionAnswerTextEdit->clear();
                 } else {
                     QMessageBox::critical(this, "Error", response["message"].toString());
                 }
@@ -170,7 +187,8 @@ void GradingWidget::onSubmitGrade()
 void GradingWidget::handlePendingAttemptsResponse(const QJsonObject &response)
 {
     if (response["type"].toString() == "DATA_RESPONSE") {
-        populateAttemptsTable(response["data"].toArray());
+        m_pendingAttempts = response["data"].toArray();
+        populateAttemptsTable(m_pendingAttempts);
     } else {
         QMessageBox::critical(this, "Error", "Failed to fetch pending attempts");
     }

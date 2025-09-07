@@ -9,6 +9,7 @@ class QTableWidget;
 class QPushButton;
 class QDoubleSpinBox;
 class QLabel;
+class QTextEdit;
 QT_END_NAMESPACE
 
 class GradingWidget : public QWidget
@@ -33,6 +34,8 @@ private:
     QDoubleSpinBox *m_scoreSpinBox;
     QPushButton *m_submitGradeButton;
     QLabel *m_scoreInfoLabel;
+    QTextEdit *m_questionAnswerTextEdit;
+    QJsonArray m_pendingAttempts;
 };
 
 #endif // GRADINGWIDGET_H
