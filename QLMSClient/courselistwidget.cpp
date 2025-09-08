@@ -75,7 +75,7 @@ void CourseListWidget::setupUi()
     rightLayout->addWidget(m_contentGroup);
     splitter->addWidget(rightWidget);
     splitter->setStretchFactor(0, 1);
-    splitter->setStretchFactor(1, 2);
+    splitter->setStretchFactor(1, 1);
 
     mainLayout->addWidget(splitter);
 

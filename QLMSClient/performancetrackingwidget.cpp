@@ -46,6 +46,7 @@ void PerformanceTrackingWidget::setupUi()
     m_filterWidget->setFilterOptions({"Student", "Quiz", "Course"});
     leftLayout->addWidget(m_filterWidget);
     m_treeWidget = new QTreeWidget(this);
+    m_treeWidget->setColumnWidth(0, 350);
     m_treeWidget->setHeaderLabels({"Name", "Type", "ID"});
     m_treeWidget->setColumnHidden(2, true);
     leftLayout->addWidget(m_treeWidget);
@@ -62,7 +63,7 @@ void PerformanceTrackingWidget::setupUi()
     rightLayout->addWidget(m_detailsGroup);
     splitter->addWidget(rightWidget);
     splitter->setStretchFactor(0, 1);
-    splitter->setStretchFactor(1, 2);
+    splitter->setStretchFactor(1, 1);
 
     mainLayout->addWidget(splitter);
 

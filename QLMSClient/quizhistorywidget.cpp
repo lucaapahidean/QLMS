@@ -46,9 +46,9 @@ void QuizHistoryWidget::setupUi()
     m_attemptsFilterWidget->setFilterOptions({"Name", "Instructor"});
     leftLayout->addWidget(m_attemptsFilterWidget);
     m_attemptsTreeWidget = new QTreeWidget(this);
-    m_attemptsTreeWidget->setHeaderLabels({"Name", "Details", "ID", "Instructor"});
-    m_attemptsTreeWidget->setColumnHidden(2, true);
+    m_attemptsTreeWidget->setHeaderLabels({"Name", "Score", "Status", "ID", "Instructor"});
     m_attemptsTreeWidget->setColumnHidden(3, true);
+    m_attemptsTreeWidget->setColumnHidden(4, true);
     leftLayout->addWidget(m_attemptsTreeWidget);
     splitter->addWidget(leftWidget);
 
@@ -63,7 +63,7 @@ void QuizHistoryWidget::setupUi()
     rightLayout->addWidget(m_attemptDetailsGroup);
     splitter->addWidget(rightWidget);
     splitter->setStretchFactor(0, 1);
-    splitter->setStretchFactor(1, 2);
+    splitter->setStretchFactor(1, 1);
 
     mainLayout->addWidget(splitter);
 
@@ -94,10 +94,10 @@ void QuizHistoryWidget::onRefresh()
 void QuizHistoryWidget::onAttemptSelected()
 {
     QTreeWidgetItem *item = m_attemptsTreeWidget->currentItem();
-    if (!item || item->text(2).isEmpty())
+    if (!item || item->text(3).isEmpty())
         return;
 
-    int attemptId = item->text(2).toInt();
+    int attemptId = item->text(3).toInt();
     QJsonObject data;
     data["attempt_id"] = attemptId;
     NetworkManager::instance().sendCommand("GET_ATTEMPT_DETAILS",
@@ -199,25 +199,26 @@ void QuizHistoryWidget::populateAttemptsList()
         if (!quizItems.contains(quizId)) {
             auto *quizItem = new QTreeWidgetItem(courseItems[courseId]);
             quizItem->setText(0, attempt["quiz_title"].toString());
-            quizItem->setText(3, attempt["instructor_name"].toString());
+            quizItem->setText(4, attempt["instructor_name"].toString());
             quizItems[quizId] = quizItem;
         }
 
         auto *attemptItem = new QTreeWidgetItem(quizItems[quizId]);
         QString statusText = (attempt["status"].toString() == "completed") ? "Graded" : "Pending";
-        QString text;
-        if (attempt["final_score"].isNull()) {
-            text = QString("Attempt %1 - %2").arg(attempt["attempt_number"].toInt()).arg(statusText);
-        } else {
-            text = QString("Attempt %1 - Score: %2% - %3")
-                       .arg(attempt["attempt_number"].toInt())
-                       .arg(attempt["final_score"].toDouble(), 0, 'f', 1)
-                       .arg(statusText);
+        QString scoreText = "N/A";
+        if (!attempt["final_score"].isNull()) {
+            scoreText = QString("%1%").arg(attempt["final_score"].toDouble(), 0, 'f', 1);
         }
-        attemptItem->setText(0, text);
-        attemptItem->setText(2, QString::number(attempt["attempt_id"].toInt()));
+
+        attemptItem->setText(0, QString("Attempt %1").arg(attempt["attempt_number"].toInt()));
+        attemptItem->setText(1, scoreText);
+        attemptItem->setText(2, statusText);
+        attemptItem->setText(3, QString::number(attempt["attempt_id"].toInt()));
     }
     m_attemptsTreeWidget->expandAll();
+    for (int i = 0; i < m_attemptsTreeWidget->columnCount(); ++i) {
+        m_attemptsTreeWidget->resizeColumnToContents(i);
+    }
 }
 
 void QuizHistoryWidget::applyFilter()
@@ -240,7 +241,7 @@ bool QuizHistoryWidget::applyFilterRecursive(QTreeWidgetItem *item,
         }
     }
 
-    int column = (filterBy == "Name") ? 0 : 3;
+    int column = (filterBy == "Name") ? 0 : 4;
     bool selfMatches = item->text(column).contains(text, Qt::CaseInsensitive);
     bool shouldBeVisible = selfMatches || anyChildMatches;
     item->setHidden(!shouldBeVisible);

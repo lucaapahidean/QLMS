@@ -44,6 +44,7 @@ void CourseManagementWidget::setupUi()
     auto *leftLayout = new QVBoxLayout(leftWidget);
     leftLayout->addWidget(new QLabel("Course Materials", this));
     m_materialsTreeWidget = new QTreeWidget(this);
+    m_materialsTreeWidget->setColumnWidth(0, 350);
     m_materialsTreeWidget->setHeaderLabels({"Name", "Type", "ID"});
     m_materialsTreeWidget->setColumnHidden(2, true); // Hide ID column
     leftLayout->addWidget(m_materialsTreeWidget);
@@ -67,7 +68,7 @@ void CourseManagementWidget::setupUi()
     rightLayout->addWidget(m_contentGroup);
     splitter->addWidget(rightWidget);
     splitter->setStretchFactor(0, 1);
-    splitter->setStretchFactor(1, 2);
+    splitter->setStretchFactor(1, 1);
 
     mainLayout->addWidget(splitter);
 
