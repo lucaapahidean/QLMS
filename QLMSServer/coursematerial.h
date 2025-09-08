@@ -11,7 +11,10 @@ class Question;
 class CourseMaterial
 {
 public:
-    CourseMaterial(int id = 0, const QString &title = QString());
+    CourseMaterial(int id = 0,
+                   const QString &title = QString(),
+                   int courseId = 0,
+                   int creatorId = 0);
     virtual ~CourseMaterial() = default;
 
     int getId() const { return m_id; }
@@ -20,18 +23,26 @@ public:
     QString getTitle() const { return m_title; }
     void setTitle(const QString &title) { m_title = title; }
 
+    int getCourseId() const { return m_courseId; }
+    void setCourseId(int courseId) { m_courseId = courseId; }
+
+    int getCreatorId() const { return m_creatorId; }
+    void setCreatorId(int creatorId) { m_creatorId = creatorId; }
+
     virtual QString getType() const = 0;
     virtual QJsonObject toJson(bool includeAnswers = false) const;
 
 protected:
     int m_id;
     QString m_title;
+    int m_courseId;
+    int m_creatorId;
 };
 
 class TextLesson : public CourseMaterial
 {
 public:
-    TextLesson(int id = 0, const QString &title = QString());
+    TextLesson(int id = 0, const QString &title = QString(), int courseId = 0, int creatorId = 0);
 
     QString getType() const override { return "lesson"; }
 
@@ -47,7 +58,7 @@ private:
 class Quiz : public CourseMaterial
 {
 public:
-    Quiz(int id = 0, const QString &title = QString());
+    Quiz(int id = 0, const QString &title = QString(), int courseId = 0, int creatorId = 0);
 
     QString getType() const override { return "quiz"; }
 

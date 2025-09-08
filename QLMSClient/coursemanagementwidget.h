@@ -6,7 +6,8 @@
 #include <QWidget>
 
 QT_BEGIN_NAMESPACE
-class QListWidget;
+class QTreeWidget;
+class QTreeWidgetItem;
 class QTextEdit;
 class QPushButton;
 class QGroupBox;
@@ -21,25 +22,24 @@ public:
     explicit CourseManagementWidget(QWidget *parent = nullptr);
 
 private slots:
-    void onRefreshMaterials();
-    void onMaterialSelected();
+    void onRefresh();
+    void onItemSelected();
     void onDeleteMaterial();
     void onAddMaterial();
-    void handleMaterialsResponse(const QJsonObject &response);
+    void handleClassesResponse(const QJsonObject &response);
+    void handleCoursesResponse(const QJsonObject &response, QTreeWidgetItem *classItem);
+    void handleMaterialsResponse(const QJsonObject &response, QTreeWidgetItem *courseItem);
     void handleMaterialDetailsResponse(const QJsonObject &response);
     void handleDeleteMaterialResponse(const QJsonObject &response);
 
 private:
     void setupUi();
-    void populateMaterialsList(const QJsonArray &materials);
     void displayLesson(const QJsonObject &lesson);
     void displayQuiz(const QJsonObject &quiz);
     void clearContentArea();
 
-    QJsonArray m_materials;
-
     // UI Elements
-    QListWidget *m_materialsListWidget;
+    QTreeWidget *m_materialsTreeWidget;
     QPushButton *m_refreshButton;
     QPushButton *m_addButton;
     QPushButton *m_deleteButton;

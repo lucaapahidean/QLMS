@@ -5,18 +5,19 @@
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
-#include <QListWidget>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QSplitter>
 #include <QTextEdit>
+#include <QTreeWidget>
+#include <QTreeWidgetItem>
 #include <QVBoxLayout>
 
 CourseManagementWidget::CourseManagementWidget(QWidget *parent)
     : QWidget(parent)
 {
     setupUi();
-    onRefreshMaterials();
+    onRefresh();
 }
 
 void CourseManagementWidget::setupUi()
@@ -24,7 +25,7 @@ void CourseManagementWidget::setupUi()
     auto *mainLayout = new QHBoxLayout(this);
     auto *splitter = new QSplitter(Qt::Horizontal, this);
 
-    // Left panel - Materials list
+    // Left panel - Materials tree
     auto *leftWidget = new QWidget(this);
     auto *leftLayout = new QVBoxLayout(leftWidget);
 
@@ -34,8 +35,10 @@ void CourseManagementWidget::setupUi()
     materialsLabel->setFont(font);
     leftLayout->addWidget(materialsLabel);
 
-    m_materialsListWidget = new QListWidget(this);
-    leftLayout->addWidget(m_materialsListWidget);
+    m_materialsTreeWidget = new QTreeWidget(this);
+    m_materialsTreeWidget->setHeaderLabels({"Name", "Type", "ID"});
+    m_materialsTreeWidget->setColumnHidden(2, true); // Hide ID column
+    leftLayout->addWidget(m_materialsTreeWidget);
 
     auto *buttonLayout = new QHBoxLayout();
     m_refreshButton = new QPushButton("Refresh", this);
@@ -68,46 +71,38 @@ void CourseManagementWidget::setupUi()
     mainLayout->addWidget(splitter);
 
     // Connect signals
-    connect(m_refreshButton,
-            &QPushButton::clicked,
-            this,
-            &CourseManagementWidget::onRefreshMaterials);
+    connect(m_refreshButton, &QPushButton::clicked, this, &CourseManagementWidget::onRefresh);
     connect(m_addButton, &QPushButton::clicked, this, &CourseManagementWidget::onAddMaterial);
     connect(m_deleteButton, &QPushButton::clicked, this, &CourseManagementWidget::onDeleteMaterial);
-    connect(m_materialsListWidget, &QListWidget::itemSelectionChanged, this, [this]() {
-        m_deleteButton->setEnabled(m_materialsListWidget->currentRow() >= 0);
-    });
-    connect(m_materialsListWidget,
-            &QListWidget::itemClicked,
+    connect(m_materialsTreeWidget,
+            &QTreeWidget::itemSelectionChanged,
             this,
-            &CourseManagementWidget::onMaterialSelected);
+            &CourseManagementWidget::onItemSelected);
 }
 
-void CourseManagementWidget::onRefreshMaterials()
+void CourseManagementWidget::onRefresh()
 {
-    NetworkManager::instance().sendCommand("GET_MATERIALS",
+    m_materialsTreeWidget->clear();
+    NetworkManager::instance().sendCommand("GET_ALL_CLASSES",
                                            QJsonObject(),
                                            [this](const QJsonObject &response) {
-                                               handleMaterialsResponse(response);
+                                               handleClassesResponse(response);
                                            });
 }
 
-void CourseManagementWidget::onMaterialSelected()
+void CourseManagementWidget::onItemSelected()
 {
-    int row = m_materialsListWidget->currentRow();
-    if (row < 0 || row >= m_materials.size())
+    QTreeWidgetItem *item = m_materialsTreeWidget->currentItem();
+    if (!item) {
+        m_deleteButton->setEnabled(false);
         return;
+    }
 
-    QJsonObject material = m_materials[row].toObject();
-    QString type = material["type"].toString();
+    QString type = item->text(1);
+    m_deleteButton->setEnabled(type == "lesson" || type == "quiz");
 
-    if (type == "lesson") {
-        // For lessons, the content is already available from the GET_MATERIALS call.
-        // No need to make another network request.
-        displayLesson(material);
-    } else if (type == "quiz") {
-        // For quizzes, we fetch details to get correct answers for the instructor view.
-        int materialId = material["material_id"].toInt();
+    if (type == "lesson" || type == "quiz") {
+        int materialId = item->text(2).toInt();
         QJsonObject data;
         data["material_id"] = materialId;
         NetworkManager::instance().sendCommand("GET_MATERIAL_DETAILS",
@@ -115,17 +110,19 @@ void CourseManagementWidget::onMaterialSelected()
                                                [this](const QJsonObject &response) {
                                                    handleMaterialDetailsResponse(response);
                                                });
+    } else {
+        clearContentArea();
     }
 }
 
 void CourseManagementWidget::onDeleteMaterial()
 {
-    int row = m_materialsListWidget->currentRow();
-    if (row < 0)
+    QTreeWidgetItem *item = m_materialsTreeWidget->currentItem();
+    if (!item || (item->text(1) != "lesson" && item->text(1) != "quiz"))
         return;
 
-    int materialId = m_materials[row].toObject()["material_id"].toInt();
-    QString materialTitle = m_materials[row].toObject()["title"].toString();
+    int materialId = item->text(2).toInt();
+    QString materialTitle = item->text(0);
 
     int ret = QMessageBox::question(
         this,
@@ -150,18 +147,71 @@ void CourseManagementWidget::onAddMaterial()
 {
     auto *wizard = new MaterialCreationWizard(this);
     if (wizard->exec() == QDialog::Accepted) {
-        onRefreshMaterials();
+        onRefresh();
     }
 }
 
-void CourseManagementWidget::handleMaterialsResponse(const QJsonObject &response)
+void CourseManagementWidget::handleClassesResponse(const QJsonObject &response)
 {
     if (response["type"].toString() == "DATA_RESPONSE") {
-        m_materials = response["data"].toArray();
-        populateMaterialsList(m_materials);
-        clearContentArea();
-    } else {
-        QMessageBox::critical(this, "Error", "Failed to fetch materials");
+        QJsonArray classes = response["data"].toArray();
+        for (const auto &val : classes) {
+            QJsonObject classObj = val.toObject();
+            auto *classItem = new QTreeWidgetItem(m_materialsTreeWidget);
+            classItem->setText(0, classObj["class_name"].toString());
+            classItem->setText(1, "class");
+            classItem->setText(2, QString::number(classObj["class_id"].toInt()));
+
+            QJsonObject data;
+            data["class_id"] = classObj["class_id"].toInt();
+            NetworkManager::instance().sendCommand("GET_COURSES_FOR_CLASS",
+                                                   data,
+                                                   [this,
+                                                    classItem](const QJsonObject &courseResponse) {
+                                                       handleCoursesResponse(courseResponse,
+                                                                             classItem);
+                                                   });
+        }
+    }
+}
+
+void CourseManagementWidget::handleCoursesResponse(const QJsonObject &response,
+                                                   QTreeWidgetItem *classItem)
+{
+    if (response["type"].toString() == "DATA_RESPONSE") {
+        QJsonArray courses = response["data"].toArray();
+        for (const auto &val : courses) {
+            QJsonObject courseObj = val.toObject();
+            auto *courseItem = new QTreeWidgetItem(classItem);
+            courseItem->setText(0, courseObj["course_name"].toString());
+            courseItem->setText(1, "course");
+            courseItem->setText(2, QString::number(courseObj["course_id"].toInt()));
+
+            QJsonObject data;
+            data["course_id"] = courseObj["course_id"].toInt();
+            NetworkManager::instance().sendCommand("GET_MATERIALS_FOR_COURSE",
+                                                   data,
+                                                   [this, courseItem](
+                                                       const QJsonObject &materialResponse) {
+                                                       handleMaterialsResponse(materialResponse,
+                                                                               courseItem);
+                                                   });
+        }
+    }
+}
+
+void CourseManagementWidget::handleMaterialsResponse(const QJsonObject &response,
+                                                     QTreeWidgetItem *courseItem)
+{
+    if (response["type"].toString() == "DATA_RESPONSE") {
+        QJsonArray materials = response["data"].toArray();
+        for (const auto &val : materials) {
+            QJsonObject materialObj = val.toObject();
+            auto *materialItem = new QTreeWidgetItem(courseItem);
+            materialItem->setText(0, materialObj["title"].toString());
+            materialItem->setText(1, materialObj["type"].toString());
+            materialItem->setText(2, QString::number(materialObj["material_id"].toInt()));
+        }
     }
 }
 
@@ -187,22 +237,11 @@ void CourseManagementWidget::handleDeleteMaterialResponse(const QJsonObject &res
 {
     if (response["type"].toString() == "OK") {
         QMessageBox::information(this, "Success", "Material deleted successfully.");
-        onRefreshMaterials();
+        onRefresh();
     } else {
         QMessageBox::critical(this,
                               "Error",
                               response["message"].toString("Failed to delete material."));
-    }
-}
-
-void CourseManagementWidget::populateMaterialsList(const QJsonArray &materials)
-{
-    m_materialsListWidget->clear();
-    for (const QJsonValue &value : materials) {
-        QJsonObject material = value.toObject();
-        QString text
-            = QString("[%1] %2").arg(material["type"].toString()).arg(material["title"].toString());
-        m_materialsListWidget->addItem(text);
     }
 }
 

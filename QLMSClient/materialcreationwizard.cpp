@@ -21,6 +21,7 @@ MaterialCreationWizard::MaterialCreationWizard(QWidget *parent)
     : QWizard(parent)
 {
     addPage(new IntroPage);
+    addPage(new CourseSelectPage);
     addPage(new LessonPage);
     addPage(new QuizPage);
     addPage(new QuestionsPage);
@@ -39,6 +40,7 @@ void MaterialCreationWizard::accept()
 void MaterialCreationWizard::sendDataToServer()
 {
     QJsonObject data;
+    data["course_id"] = field("course.id").toInt();
 
     if (field("isLesson").toBool()) {
         data["title"] = field("lesson.title").toString();
@@ -87,11 +89,83 @@ IntroPage::IntroPage(QWidget *parent)
 
 int IntroPage::nextId() const
 {
+    return MaterialCreationWizard::Page_CourseSelect;
+}
+
+// --- Course Select Page ---
+CourseSelectPage::CourseSelectPage(QWidget *parent)
+    : QWizardPage(parent)
+{
+    setTitle("Select Course");
+    setSubTitle("Choose the class and course for this material.");
+
+    auto *layout = new QFormLayout(this);
+    m_classCombo = new QComboBox(this);
+    m_courseCombo = new QComboBox(this);
+    layout->addRow("Class:", m_classCombo);
+    layout->addRow("Course:", m_courseCombo);
+
+    registerField("course.id", m_courseCombo, "currentData");
+
+    connect(m_classCombo,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this,
+            &CourseSelectPage::onClassSelected);
+    connect(m_courseCombo, &QComboBox::currentTextChanged, this, &QWizardPage::completeChanged);
+}
+
+void CourseSelectPage::initializePage()
+{
+    NetworkManager::instance()
+        .sendCommand("GET_ALL_CLASSES", QJsonObject(), [this](const QJsonObject &response) {
+            if (response["type"].toString() == "DATA_RESPONSE") {
+                m_classes = response["data"].toArray();
+                m_classCombo->clear();
+                for (const auto &val : m_classes) {
+                    QJsonObject classObj = val.toObject();
+                    m_classCombo->addItem(classObj["class_name"].toString(),
+                                          classObj["class_id"].toInt());
+                }
+            }
+        });
+}
+
+int CourseSelectPage::nextId() const
+{
     if (field("isLesson").toBool()) {
         return MaterialCreationWizard::Page_Lesson;
     } else {
         return MaterialCreationWizard::Page_Quiz;
     }
+}
+
+bool CourseSelectPage::isComplete() const
+{
+    return m_courseCombo->currentIndex() != -1;
+}
+
+void CourseSelectPage::onClassSelected(int index)
+{
+    if (index < 0)
+        return;
+
+    int classId = m_classCombo->itemData(index).toInt();
+    QJsonObject data;
+    data["class_id"] = classId;
+
+    NetworkManager::instance()
+        .sendCommand("GET_COURSES_FOR_CLASS", data, [this](const QJsonObject &response) {
+            if (response["type"].toString() == "DATA_RESPONSE") {
+                QJsonArray courses = response["data"].toArray();
+                m_courseCombo->clear();
+                for (const auto &val : courses) {
+                    QJsonObject courseObj = val.toObject();
+                    m_courseCombo->addItem(courseObj["course_name"].toString(),
+                                           courseObj["course_id"].toInt());
+                }
+                completeChanged();
+            }
+        });
 }
 
 // --- Lesson Page ---

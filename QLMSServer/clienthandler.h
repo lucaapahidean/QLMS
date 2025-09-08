@@ -38,7 +38,16 @@ private:
     void handleCreateUser(const QJsonObject &data);
     void handleDeleteUser(const QJsonObject &data);
     void handleGetAllUsers();
-    void handleGetMaterials();
+    void handleGetAllClasses();
+    void handleCreateClass(const QJsonObject &data);
+    void handleDeleteClass(const QJsonObject &data);
+    void handleAssignUserToClass(const QJsonObject &data);
+    void handleRemoveUserFromClass(const QJsonObject &data);
+    void handleGetClassMembers(const QJsonObject &data);
+    void handleGetCoursesForClass(const QJsonObject &data);
+    void handleCreateCourse(const QJsonObject &data);
+    void handleDeleteCourse(const QJsonObject &data);
+    void handleGetMaterialsForCourse(const QJsonObject &data);
     void handleGetMaterialDetails(const QJsonObject &data);
     void handleDeleteMaterial(const QJsonObject &data);
     void handleCreateLesson(const QJsonObject &data);

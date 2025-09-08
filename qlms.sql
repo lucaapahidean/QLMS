@@ -13,10 +13,29 @@ CREATE TABLE users (
     role VARCHAR(20) CHECK (role IN ('admin', 'instructor', 'student')) NOT NULL
 );
 
+CREATE TABLE classes (
+    class_id SERIAL PRIMARY KEY,
+    class_name VARCHAR(255) UNIQUE NOT NULL
+);
+
+CREATE TABLE courses (
+    course_id SERIAL PRIMARY KEY,
+    course_name VARCHAR(255) NOT NULL,
+    class_id INTEGER NOT NULL REFERENCES classes(class_id) ON DELETE CASCADE
+);
+
+CREATE TABLE class_members (
+    class_id INTEGER NOT NULL REFERENCES classes(class_id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    PRIMARY KEY (class_id, user_id)
+);
+
 CREATE TABLE course_materials (
     material_id SERIAL PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
-    type VARCHAR(20) CHECK (type IN ('lesson', 'quiz')) NOT NULL
+    type VARCHAR(20) CHECK (type IN ('lesson', 'quiz')) NOT NULL,
+    course_id INTEGER REFERENCES courses(course_id) ON DELETE SET NULL,
+    creator_id INTEGER REFERENCES users(user_id) ON DELETE SET NULL
 );
 
 CREATE TABLE text_lessons (
@@ -28,9 +47,9 @@ CREATE TABLE quizzes (
     quiz_id INTEGER PRIMARY KEY REFERENCES course_materials(material_id) ON DELETE CASCADE,
     max_attempts INTEGER NOT NULL DEFAULT 1,
     feedback_type VARCHAR(30) CHECK (feedback_type IN (
-        'detailed_with_answers',    -- Shows wrong/right + correct answers
+        'detailed_with_answers',     -- Shows wrong/right + correct answers
         'detailed_without_answers',  -- Shows wrong/right but not correct answers
-        'score_only'                -- Shows only the score
+        'score_only'                 -- Shows only the score
     )) NOT NULL DEFAULT 'detailed_with_answers'
 );
 
@@ -80,3 +99,5 @@ CREATE INDEX idx_course_materials_type ON course_materials(type);
 CREATE INDEX idx_quiz_attempts_status ON quiz_attempts(status);
 CREATE INDEX idx_quiz_attempts_student ON quiz_attempts(student_id);
 CREATE INDEX idx_answers_attempt ON answers(attempt_id);
+CREATE INDEX idx_course_materials_course_id ON course_materials(course_id);
+CREATE INDEX idx_class_members_user_id ON class_members(user_id);

@@ -2,6 +2,7 @@
 #define DATABASEMANAGER_H
 
 #include <memory>
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QMutex>
 #include <QObject>
@@ -32,19 +33,34 @@ public:
     bool deleteUser(int userId);
     QList<std::shared_ptr<User>> getAllUsers();
 
+    // Class operations
+    QJsonArray getAllClasses();
+    QJsonArray getClassesForUser(int userId); // New function
+    bool createClass(const QString &className);
+    bool deleteClass(int classId);
+    bool assignUserToClass(int userId, int classId);
+    bool removeUserFromClass(int userId, int classId);
+    QJsonArray getClassMembers(int classId);
+
+    // Course operations
+    QJsonArray getCoursesForClass(int classId);
+    bool createCourse(const QString &courseName, int classId);
+    bool deleteCourse(int courseId);
+
     // Course material operations
     QList<std::shared_ptr<CourseMaterial>> getAllMaterials();
     std::shared_ptr<CourseMaterial> getMaterialById(int materialId);
     bool deleteMaterial(int materialId);
-    bool createLesson(const QString &title, const QString &content);
-    bool createQuizWithQuestions(const QJsonObject &quizData);
+    bool createLesson(const QString &title, const QString &content, int courseId, int creatorId);
+    bool createQuizWithQuestions(const QJsonObject &quizData, int courseId, int creatorId);
+    QJsonArray getMaterialsForCourse(int courseId);
 
     // Quiz attempt operations
     int createQuizAttempt(int quizId, int studentId, int attemptNumber);
     bool saveAnswer(int attemptId, int questionId, const QString &response);
     QJsonObject autoGradeQuizAttempt(int attemptId);
     bool finalizeAttempt(int attemptId, const QString &status, float score = -1);
-    QJsonArray getPendingAttempts();
+    QJsonArray getPendingAttempts(int instructorId);
     bool submitGrade(int attemptId, float manualScore);
     int getAttemptCount(int quizId, int studentId);
     QJsonArray getStudentQuizAttempts(int studentId);

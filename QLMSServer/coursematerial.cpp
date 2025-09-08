@@ -2,9 +2,11 @@
 #include "question.h"
 #include <QJsonArray>
 
-CourseMaterial::CourseMaterial(int id, const QString &title)
+CourseMaterial::CourseMaterial(int id, const QString &title, int courseId, int creatorId)
     : m_id(id)
     , m_title(title)
+    , m_courseId(courseId)
+    , m_creatorId(creatorId)
 {}
 
 QJsonObject CourseMaterial::toJson(bool includeAnswers) const
@@ -14,11 +16,13 @@ QJsonObject CourseMaterial::toJson(bool includeAnswers) const
     obj["material_id"] = m_id;
     obj["title"] = m_title;
     obj["type"] = getType();
+    obj["course_id"] = m_courseId;
+    obj["creator_id"] = m_creatorId;
     return obj;
 }
 
-TextLesson::TextLesson(int id, const QString &title)
-    : CourseMaterial(id, title)
+TextLesson::TextLesson(int id, const QString &title, int courseId, int creatorId)
+    : CourseMaterial(id, title, courseId, creatorId)
 {}
 
 QJsonObject TextLesson::toJson(bool includeAnswers) const
@@ -28,8 +32,8 @@ QJsonObject TextLesson::toJson(bool includeAnswers) const
     return obj;
 }
 
-Quiz::Quiz(int id, const QString &title)
-    : CourseMaterial(id, title)
+Quiz::Quiz(int id, const QString &title, int courseId, int creatorId)
+    : CourseMaterial(id, title, courseId, creatorId)
     , m_maxAttempts(1)
     , m_feedbackType("detailed_with_answers")
 {}

@@ -21,6 +21,7 @@ qt_add_executable(QLMSClient
     studentdashboard.h studentdashboard.cpp
     coursemanagementwidget.h coursemanagementwidget.cpp
     materialcreationwizard.h materialcreationwizard.cpp
+    classmanagementwidget.h classmanagementwidget.cpp
 )
 
 target_link_libraries(QLMSClient

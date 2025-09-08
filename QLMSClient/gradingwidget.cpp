@@ -41,10 +41,11 @@ void GradingWidget::setupUi()
     mainLayout->addWidget(new QLabel("Pending Manual Grading:", this));
 
     m_attemptsTable = new QTableWidget(this);
-    m_attemptsTable->setColumnCount(7);
-    m_attemptsTable->setHorizontalHeaderLabels(
-        QStringList() << "Attempt ID" << "Student" << "Quiz Title" << "Attempt #"
-                      << "Auto Score" << "Open Questions" << "Status");
+    m_attemptsTable->setColumnCount(9);
+    m_attemptsTable->setHorizontalHeaderLabels(QStringList()
+                                               << "Attempt ID" << "Student" << "Quiz Title"
+                                               << "Course" << "Class" << "Attempt #"
+                                               << "Auto Score" << "Open Questions" << "Status");
     m_attemptsTable->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_attemptsTable->setAlternatingRowColors(true);
     m_attemptsTable->horizontalHeader()->setStretchLastSection(true);
@@ -109,16 +110,25 @@ void GradingWidget::updateScoreInfo()
         return;
 
     QJsonObject attempt = m_pendingAttempts[row].toObject();
-    QString autoScore = m_attemptsTable->item(row, 4)->text();
-    QString openQuestions = m_attemptsTable->item(row, 5)->text();
     QString studentName = m_attemptsTable->item(row, 1)->text();
+    QString quizTitle = m_attemptsTable->item(row, 2)->text();
+    QString courseName = m_attemptsTable->item(row, 3)->text();
+    QString className = m_attemptsTable->item(row, 4)->text();
+    QString autoScore = m_attemptsTable->item(row, 6)->text();
+    QString openQuestions = m_attemptsTable->item(row, 7)->text();
 
     QString info = QString("Student: %1\n"
-                           "Auto-graded score: %2\n"
-                           "Number of open answer questions: %3\n\n"
+                           "Quiz: %2\n"
+                           "Course: %3\n"
+                           "Class: %4\n"
+                           "Auto-graded score: %5\n"
+                           "Number of open answer questions: %6\n\n"
                            "Enter the manual score for the open answer questions. "
                            "The final grade will be calculated as a weighted average.")
                        .arg(studentName)
+                       .arg(quizTitle)
+                       .arg(courseName)
+                       .arg(className)
                        .arg(autoScore)
                        .arg(openQuestions);
 
@@ -151,7 +161,7 @@ void GradingWidget::onSubmitGrade()
 
     int attemptId = m_attemptsTable->item(row, 0)->text().toInt();
     QString studentName = m_attemptsTable->item(row, 1)->text();
-    QString autoScore = m_attemptsTable->item(row, 4)->text();
+    QString autoScore = m_attemptsTable->item(row, 6)->text();
 
     int ret = QMessageBox::question(this,
                                     "Submit Grade",
@@ -207,22 +217,24 @@ void GradingWidget::populateAttemptsTable(const QJsonArray &attempts)
             ->setItem(row, 0, new QTableWidgetItem(QString::number(attempt["attempt_id"].toInt())));
         m_attemptsTable->setItem(row, 1, new QTableWidgetItem(attempt["student_name"].toString()));
         m_attemptsTable->setItem(row, 2, new QTableWidgetItem(attempt["quiz_title"].toString()));
+        m_attemptsTable->setItem(row, 3, new QTableWidgetItem(attempt["course_name"].toString()));
+        m_attemptsTable->setItem(row, 4, new QTableWidgetItem(attempt["class_name"].toString()));
         m_attemptsTable->setItem(row,
-                                 3,
+                                 5,
                                  new QTableWidgetItem(
                                      QString::number(attempt["attempt_number"].toInt())));
 
         // Show auto score
         double autoScore = attempt["auto_score"].toDouble();
         m_attemptsTable->setItem(row,
-                                 4,
+                                 6,
                                  new QTableWidgetItem(QString("%1%").arg(autoScore, 0, 'f', 1)));
 
         // Show number of open questions
         int manualQuestions = attempt["total_manual_points"].toInt();
-        m_attemptsTable->setItem(row, 5, new QTableWidgetItem(QString::number(manualQuestions)));
+        m_attemptsTable->setItem(row, 7, new QTableWidgetItem(QString::number(manualQuestions)));
 
-        m_attemptsTable->setItem(row, 6, new QTableWidgetItem("Pending"));
+        m_attemptsTable->setItem(row, 8, new QTableWidgetItem("Pending"));
     }
 
     m_attemptsTable->resizeColumnsToContents();

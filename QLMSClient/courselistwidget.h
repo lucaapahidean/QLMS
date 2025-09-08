@@ -6,12 +6,14 @@
 #include <QWidget>
 
 QT_BEGIN_NAMESPACE
-class QListWidget;
+class QTreeWidget;
+class QTreeWidgetItem;
 class QTextEdit;
 class QPushButton;
 class QGroupBox;
 class QVBoxLayout;
 class QTabWidget;
+class QLineEdit;
 QT_END_NAMESPACE
 
 class CourseListWidget : public QWidget
@@ -22,38 +24,39 @@ public:
     explicit CourseListWidget(int studentId, QWidget *parent = nullptr);
 
 private slots:
-    void onRefreshMaterials();
-    void onRefreshAttempts();
-    void onMaterialSelected();
+    void onRefresh();
+    void onItemSelected();
     void onAttemptSelected();
     void onStartQuiz();
     void onSubmitQuiz();
-    void handleMaterialsResponse(const QJsonObject &response);
-    void handleAttemptsResponse(const QJsonObject &response);
+    void handleClassesResponse(const QJsonObject &response);
+    void handleCoursesResponse(const QJsonObject &response, QTreeWidgetItem *classItem);
+    void handleMaterialsResponse(const QJsonObject &response, QTreeWidgetItem *courseItem);
     void handleQuizDataResponse(const QJsonObject &response);
     void handleQuizSubmissionResponse(const QJsonObject &response);
     void handleAttemptDetailsResponse(const QJsonObject &response);
+    void applyMaterialsFilter(const QString &text);
+    void applyAttemptsFilter(const QString &text);
 
 private:
     void setupUi();
-    void populateMaterialsList(const QJsonArray &materials);
-    void populateAttemptsList(const QJsonArray &attempts);
     void displayTextLesson(const QJsonObject &lesson);
     void displayQuiz(const QJsonObject &quiz);
     void displayAttemptDetails(const QJsonObject &attemptData);
     void clearContentArea();
+    void populateAttemptsList();
 
     int m_studentId;
     QJsonObject m_currentQuiz;
-    QJsonArray m_materials;
-    QJsonArray m_attempts;
+    QJsonArray m_allAttempts;
 
     // Main UI
     QTabWidget *m_tabWidget;
 
     // Materials tab widgets
-    QListWidget *m_materialsListWidget;
+    QTreeWidget *m_materialsTreeWidget;
     QPushButton *m_refreshButton;
+    QLineEdit *m_materialsFilterEdit;
     QGroupBox *m_contentGroup;
     QVBoxLayout *m_contentLayout;
     QTextEdit *m_lessonTextEdit;
@@ -61,8 +64,9 @@ private:
     QPushButton *m_submitQuizButton;
 
     // Quiz attempts tab widgets
-    QListWidget *m_attemptsListWidget;
+    QTreeWidget *m_attemptsTreeWidget;
     QPushButton *m_refreshAttemptsButton;
+    QLineEdit *m_attemptsFilterEdit;
     QGroupBox *m_attemptDetailsGroup;
     QVBoxLayout *m_attemptDetailsLayout;
     QTextEdit *m_attemptDetailsText;

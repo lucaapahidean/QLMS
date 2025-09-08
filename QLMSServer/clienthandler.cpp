@@ -79,39 +79,57 @@ void ClientHandler::processMessage(const QJsonObject &message)
         handleLogin(data);
     } else if (command == "LOGOUT") {
         handleLogout();
-    } else if (command == "GET_MATERIALS") {
-        handleGetMaterials();
     } else if (!m_currentUser) {
         QJsonObject response;
         response["type"] = "ERROR";
         response["message"] = "Not authenticated";
         sendResponse(response);
-    } else if (command == "GET_MATERIAL_DETAILS") {
-        handleGetMaterialDetails(data);
-    } else if (command == "DELETE_MATERIAL") {
-        handleDeleteMaterial(data);
-    } else if (command == "CREATE_LESSON") {
-        handleCreateLesson(data);
-    } else if (command == "CREATE_QUIZ_WITH_QUESTIONS") {
-        handleCreateQuizWithQuestions(data);
+    } else if (command == "GET_ALL_USERS") {
+        handleGetAllUsers();
     } else if (command == "CREATE_USER") {
         handleCreateUser(data);
     } else if (command == "DELETE_USER") {
         handleDeleteUser(data);
-    } else if (command == "GET_ALL_USERS") {
-        handleGetAllUsers();
+    } else if (command == "GET_ALL_CLASSES") {
+        handleGetAllClasses();
+    } else if (command == "CREATE_CLASS") {
+        handleCreateClass(data);
+    } else if (command == "DELETE_CLASS") {
+        handleDeleteClass(data);
+    } else if (command == "ASSIGN_USER_TO_CLASS") {
+        handleAssignUserToClass(data);
+    } else if (command == "REMOVE_USER_FROM_CLASS") {
+        handleRemoveUserFromClass(data);
+    } else if (command == "GET_CLASS_MEMBERS") {
+        handleGetClassMembers(data);
+    } else if (command == "GET_COURSES_FOR_CLASS") {
+        handleGetCoursesForClass(data);
+    } else if (command == "CREATE_COURSE") {
+        handleCreateCourse(data);
+    } else if (command == "DELETE_COURSE") {
+        handleDeleteCourse(data);
+    } else if (command == "GET_MATERIALS_FOR_COURSE") {
+        handleGetMaterialsForCourse(data);
+    } else if (command == "CREATE_LESSON") {
+        handleCreateLesson(data);
+    } else if (command == "CREATE_QUIZ_WITH_QUESTIONS") {
+        handleCreateQuizWithQuestions(data);
+    } else if (command == "DELETE_MATERIAL") {
+        handleDeleteMaterial(data);
+    } else if (command == "GET_MATERIAL_DETAILS") {
+        handleGetMaterialDetails(data);
     } else if (command == "START_QUIZ") {
         handleStartQuiz(data);
     } else if (command == "FINISH_ATTEMPT") {
         handleFinishAttempt(data);
-    } else if (command == "GET_PENDING_ATTEMPTS") {
-        handleGetPendingAttempts();
-    } else if (command == "SUBMIT_GRADE") {
-        handleSubmitGrade(data);
     } else if (command == "GET_MY_ATTEMPTS") {
         handleGetMyAttempts();
     } else if (command == "GET_ATTEMPT_DETAILS") {
         handleGetAttemptDetails(data);
+    } else if (command == "GET_PENDING_ATTEMPTS") {
+        handleGetPendingAttempts();
+    } else if (command == "SUBMIT_GRADE") {
+        handleSubmitGrade(data);
     } else {
         QJsonObject response;
         response["type"] = "ERROR";
@@ -169,6 +187,28 @@ void ClientHandler::handleLogout()
     sendResponse(response);
 }
 
+void ClientHandler::handleGetAllUsers()
+{
+    if (!m_currentUser || m_currentUser->getRole() != "admin") {
+        QJsonObject response;
+        response["type"] = "ERROR";
+        response["message"] = "Unauthorized";
+        sendResponse(response);
+        return;
+    }
+
+    auto users = DatabaseManager::instance().getAllUsers();
+    QJsonArray usersArray;
+    for (const auto &user : users) {
+        usersArray.append(user->toJson());
+    }
+
+    QJsonObject response;
+    response["type"] = "DATA_RESPONSE";
+    response["data"] = usersArray;
+    sendResponse(response);
+}
+
 void ClientHandler::handleCreateUser(const QJsonObject &data)
 {
     if (!m_currentUser || m_currentUser->getRole() != "admin") {
@@ -223,7 +263,30 @@ void ClientHandler::handleDeleteUser(const QJsonObject &data)
     sendResponse(response);
 }
 
-void ClientHandler::handleGetAllUsers()
+void ClientHandler::handleGetAllClasses()
+{
+    if (!m_currentUser) {
+        QJsonObject response;
+        response["type"] = "ERROR";
+        response["message"] = "Unauthorized";
+        sendResponse(response);
+        return;
+    }
+
+    QJsonArray classes;
+    if (m_currentUser->getRole() == "admin") {
+        classes = DatabaseManager::instance().getAllClasses();
+    } else {
+        classes = DatabaseManager::instance().getClassesForUser(m_currentUser->getId());
+    }
+
+    QJsonObject response;
+    response["type"] = "DATA_RESPONSE";
+    response["data"] = classes;
+    sendResponse(response);
+}
+
+void ClientHandler::handleCreateClass(const QJsonObject &data)
 {
     if (!m_currentUser || m_currentUser->getRole() != "admin") {
         QJsonObject response;
@@ -233,48 +296,250 @@ void ClientHandler::handleGetAllUsers()
         return;
     }
 
-    auto users = DatabaseManager::instance().getAllUsers();
-    QJsonArray usersArray;
-    for (const auto &user : users) {
-        usersArray.append(user->toJson());
-    }
+    QString className = data["class_name"].toString();
+    bool success = DatabaseManager::instance().createClass(className);
 
     QJsonObject response;
-    response["type"] = "DATA_RESPONSE";
-    response["data"] = usersArray;
-    sendResponse(response);
-}
-
-void ClientHandler::handleGetMaterials()
-{
-    auto materials = DatabaseManager::instance().getAllMaterials();
-    QJsonArray materialsArray;
-    for (const auto &material : materials) {
-        materialsArray.append(material->toJson(false)); // Pass false to exclude answers
-    }
-
-    QJsonObject response;
-    response["type"] = "DATA_RESPONSE";
-    response["data"] = materialsArray;
-    sendResponse(response);
-}
-
-void ClientHandler::handleGetMaterialDetails(const QJsonObject &data)
-{
-    int materialId = data["material_id"].toInt();
-    auto material = DatabaseManager::instance().getMaterialById(materialId);
-
-    if (material) {
-        QJsonObject response;
-        response["type"] = "DATA_RESPONSE";
-        response["data"] = material->toJson(true); // Include answers for instructor
-        sendResponse(response);
+    if (success) {
+        response["type"] = "OK";
+        response["message"] = "Class created successfully";
     } else {
+        response["type"] = "ERROR";
+        response["message"] = "Failed to create class";
+    }
+    sendResponse(response);
+}
+
+void ClientHandler::handleDeleteClass(const QJsonObject &data)
+{
+    if (!m_currentUser || m_currentUser->getRole() != "admin") {
         QJsonObject response;
         response["type"] = "ERROR";
-        response["message"] = "Material not found";
+        response["message"] = "Unauthorized";
         sendResponse(response);
+        return;
     }
+
+    int classId = data["class_id"].toInt();
+    bool success = DatabaseManager::instance().deleteClass(classId);
+
+    QJsonObject response;
+    if (success) {
+        response["type"] = "OK";
+        response["message"] = "Class deleted successfully";
+    } else {
+        response["type"] = "ERROR";
+        response["message"] = "Failed to delete class";
+    }
+    sendResponse(response);
+}
+
+void ClientHandler::handleAssignUserToClass(const QJsonObject &data)
+{
+    if (!m_currentUser || m_currentUser->getRole() != "admin") {
+        QJsonObject response;
+        response["type"] = "ERROR";
+        response["message"] = "Unauthorized";
+        sendResponse(response);
+        return;
+    }
+
+    int userId = data["user_id"].toInt();
+    int classId = data["class_id"].toInt();
+    bool success = DatabaseManager::instance().assignUserToClass(userId, classId);
+
+    QJsonObject response;
+    if (success) {
+        response["type"] = "OK";
+        response["message"] = "User assigned successfully";
+    } else {
+        response["type"] = "ERROR";
+        response["message"] = "Failed to assign user";
+    }
+    sendResponse(response);
+}
+
+void ClientHandler::handleRemoveUserFromClass(const QJsonObject &data)
+{
+    if (!m_currentUser || m_currentUser->getRole() != "admin") {
+        QJsonObject response;
+        response["type"] = "ERROR";
+        response["message"] = "Unauthorized";
+        sendResponse(response);
+        return;
+    }
+
+    int userId = data["user_id"].toInt();
+    int classId = data["class_id"].toInt();
+    bool success = DatabaseManager::instance().removeUserFromClass(userId, classId);
+
+    QJsonObject response;
+    if (success) {
+        response["type"] = "OK";
+        response["message"] = "User removed successfully";
+    } else {
+        response["type"] = "ERROR";
+        response["message"] = "Failed to remove user";
+    }
+    sendResponse(response);
+}
+
+void ClientHandler::handleGetClassMembers(const QJsonObject &data)
+{
+    if (!m_currentUser || m_currentUser->getRole() != "admin") {
+        QJsonObject response;
+        response["type"] = "ERROR";
+        response["message"] = "Unauthorized";
+        sendResponse(response);
+        return;
+    }
+
+    int classId = data["class_id"].toInt();
+    QJsonArray members = DatabaseManager::instance().getClassMembers(classId);
+
+    QJsonObject response;
+    response["type"] = "DATA_RESPONSE";
+    response["data"] = members;
+    sendResponse(response);
+}
+
+void ClientHandler::handleGetCoursesForClass(const QJsonObject &data)
+{
+    if (!m_currentUser) {
+        QJsonObject response;
+        response["type"] = "ERROR";
+        response["message"] = "Unauthorized";
+        sendResponse(response);
+        return;
+    }
+
+    int classId = data["class_id"].toInt();
+    QJsonArray courses = DatabaseManager::instance().getCoursesForClass(classId);
+
+    QJsonObject response;
+    response["type"] = "DATA_RESPONSE";
+    response["data"] = courses;
+    sendResponse(response);
+}
+
+void ClientHandler::handleCreateCourse(const QJsonObject &data)
+{
+    if (!m_currentUser || m_currentUser->getRole() != "admin") {
+        QJsonObject response;
+        response["type"] = "ERROR";
+        response["message"] = "Unauthorized";
+        sendResponse(response);
+        return;
+    }
+
+    QString courseName = data["course_name"].toString();
+    int classId = data["class_id"].toInt();
+    bool success = DatabaseManager::instance().createCourse(courseName, classId);
+
+    QJsonObject response;
+    if (success) {
+        response["type"] = "OK";
+        response["message"] = "Course created successfully";
+    } else {
+        response["type"] = "ERROR";
+        response["message"] = "Failed to create course";
+    }
+    sendResponse(response);
+}
+
+void ClientHandler::handleDeleteCourse(const QJsonObject &data)
+{
+    if (!m_currentUser || m_currentUser->getRole() != "admin") {
+        QJsonObject response;
+        response["type"] = "ERROR";
+        response["message"] = "Unauthorized";
+        sendResponse(response);
+        return;
+    }
+
+    int courseId = data["course_id"].toInt();
+    bool success = DatabaseManager::instance().deleteCourse(courseId);
+
+    QJsonObject response;
+    if (success) {
+        response["type"] = "OK";
+        response["message"] = "Course deleted successfully";
+    } else {
+        response["type"] = "ERROR";
+        response["message"] = "Failed to delete course";
+    }
+    sendResponse(response);
+}
+
+void ClientHandler::handleGetMaterialsForCourse(const QJsonObject &data)
+{
+    if (!m_currentUser) {
+        QJsonObject response;
+        response["type"] = "ERROR";
+        response["message"] = "Unauthorized";
+        sendResponse(response);
+        return;
+    }
+
+    int courseId = data["course_id"].toInt();
+    QJsonArray materials = DatabaseManager::instance().getMaterialsForCourse(courseId);
+
+    QJsonObject response;
+    response["type"] = "DATA_RESPONSE";
+    response["data"] = materials;
+    sendResponse(response);
+}
+
+void ClientHandler::handleCreateLesson(const QJsonObject &data)
+{
+    if (!m_currentUser || m_currentUser->getRole() != "instructor") {
+        QJsonObject response;
+        response["type"] = "ERROR";
+        response["message"] = "Unauthorized";
+        sendResponse(response);
+        return;
+    }
+
+    QString title = data["title"].toString();
+    QString content = data["content"].toString();
+    int courseId = data["course_id"].toInt();
+    int creatorId = m_currentUser->getId();
+
+    bool success = DatabaseManager::instance().createLesson(title, content, courseId, creatorId);
+
+    QJsonObject response;
+    if (success) {
+        response["type"] = "OK";
+        response["message"] = "Lesson created successfully";
+    } else {
+        response["type"] = "ERROR";
+        response["message"] = "Failed to create lesson";
+    }
+    sendResponse(response);
+}
+
+void ClientHandler::handleCreateQuizWithQuestions(const QJsonObject &data)
+{
+    if (!m_currentUser || m_currentUser->getRole() != "instructor") {
+        QJsonObject response;
+        response["type"] = "ERROR";
+        response["message"] = "Unauthorized";
+        sendResponse(response);
+        return;
+    }
+    int courseId = data["course_id"].toInt();
+    int creatorId = m_currentUser->getId();
+    bool success = DatabaseManager::instance().createQuizWithQuestions(data, courseId, creatorId);
+
+    QJsonObject response;
+    if (success) {
+        response["type"] = "OK";
+        response["message"] = "Quiz created successfully";
+    } else {
+        response["type"] = "ERROR";
+        response["message"] = "Failed to create quiz";
+    }
+    sendResponse(response);
 }
 
 void ClientHandler::handleDeleteMaterial(const QJsonObject &data)
@@ -301,53 +566,22 @@ void ClientHandler::handleDeleteMaterial(const QJsonObject &data)
     sendResponse(response);
 }
 
-void ClientHandler::handleCreateLesson(const QJsonObject &data)
+void ClientHandler::handleGetMaterialDetails(const QJsonObject &data)
 {
-    if (!m_currentUser || m_currentUser->getRole() != "instructor") {
+    int materialId = data["material_id"].toInt();
+    auto material = DatabaseManager::instance().getMaterialById(materialId);
+
+    if (material) {
+        QJsonObject response;
+        response["type"] = "DATA_RESPONSE";
+        response["data"] = material->toJson(m_currentUser->getRole() == "instructor");
+        sendResponse(response);
+    } else {
         QJsonObject response;
         response["type"] = "ERROR";
-        response["message"] = "Unauthorized";
+        response["message"] = "Material not found";
         sendResponse(response);
-        return;
     }
-
-    QString title = data["title"].toString();
-    QString content = data["content"].toString();
-
-    bool success = DatabaseManager::instance().createLesson(title, content);
-
-    QJsonObject response;
-    if (success) {
-        response["type"] = "OK";
-        response["message"] = "Lesson created successfully";
-    } else {
-        response["type"] = "ERROR";
-        response["message"] = "Failed to create lesson";
-    }
-    sendResponse(response);
-}
-
-void ClientHandler::handleCreateQuizWithQuestions(const QJsonObject &data)
-{
-    if (!m_currentUser || m_currentUser->getRole() != "instructor") {
-        QJsonObject response;
-        response["type"] = "ERROR";
-        response["message"] = "Unauthorized";
-        sendResponse(response);
-        return;
-    }
-
-    bool success = DatabaseManager::instance().createQuizWithQuestions(data);
-
-    QJsonObject response;
-    if (success) {
-        response["type"] = "OK";
-        response["message"] = "Quiz created successfully";
-    } else {
-        response["type"] = "ERROR";
-        response["message"] = "Failed to create quiz";
-    }
-    sendResponse(response);
 }
 
 void ClientHandler::handleStartQuiz(const QJsonObject &data)
@@ -505,7 +739,7 @@ void ClientHandler::handleGetPendingAttempts()
         return;
     }
 
-    QJsonArray attempts = DatabaseManager::instance().getPendingAttempts();
+    QJsonArray attempts = DatabaseManager::instance().getPendingAttempts(m_currentUser->getId());
 
     QJsonObject response;
     response["type"] = "DATA_RESPONSE";

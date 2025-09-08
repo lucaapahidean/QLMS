@@ -22,7 +22,7 @@ class MaterialCreationWizard : public QWizard
 public:
     explicit MaterialCreationWizard(QWidget *parent = nullptr);
 
-    enum { Page_Intro, Page_Lesson, Page_Quiz, Page_Questions, Page_Conclusion };
+    enum { Page_Intro, Page_CourseSelect, Page_Lesson, Page_Quiz, Page_Questions, Page_Conclusion };
 
     void accept() override;
 
@@ -37,6 +37,25 @@ class IntroPage : public QWizardPage
 public:
     IntroPage(QWidget *parent = nullptr);
     int nextId() const override;
+};
+
+class CourseSelectPage : public QWizardPage
+{
+    Q_OBJECT
+
+public:
+    CourseSelectPage(QWidget *parent = nullptr);
+    void initializePage() override;
+    int nextId() const override;
+    bool isComplete() const override;
+
+private slots:
+    void onClassSelected(int index);
+
+private:
+    QComboBox *m_classCombo;
+    QComboBox *m_courseCombo;
+    QJsonArray m_classes;
 };
 
 class LessonPage : public QWizardPage

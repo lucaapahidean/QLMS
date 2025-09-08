@@ -188,6 +188,211 @@ QList<std::shared_ptr<User>> DatabaseManager::getAllUsers()
     return users;
 }
 
+QJsonArray DatabaseManager::getAllClasses()
+{
+    QJsonArray classes;
+    QMutexLocker locker(&m_mutex);
+    QSqlDatabase db = getDatabase();
+    if (!db.open())
+        return classes;
+
+    QSqlQuery query(db);
+    query.prepare("SELECT class_id, class_name FROM classes ORDER BY class_name");
+
+    if (!query.exec()) {
+        return classes;
+    }
+
+    while (query.next()) {
+        QJsonObject classObj;
+        classObj["class_id"] = query.value("class_id").toInt();
+        classObj["class_name"] = query.value("class_name").toString();
+        classes.append(classObj);
+    }
+
+    return classes;
+}
+
+QJsonArray DatabaseManager::getClassesForUser(int userId)
+{
+    QJsonArray classes;
+    QMutexLocker locker(&m_mutex);
+    QSqlDatabase db = getDatabase();
+    if (!db.open())
+        return classes;
+
+    QSqlQuery query(db);
+    query.prepare("SELECT c.class_id, c.class_name FROM classes c "
+                  "JOIN class_members cm ON c.class_id = cm.class_id "
+                  "WHERE cm.user_id = :user_id ORDER BY c.class_name");
+    query.bindValue(":user_id", userId);
+
+    if (!query.exec()) {
+        qWarning() << "Failed to get classes for user:" << query.lastError().text();
+        return classes;
+    }
+
+    while (query.next()) {
+        QJsonObject classObj;
+        classObj["class_id"] = query.value("class_id").toInt();
+        classObj["class_name"] = query.value("class_name").toString();
+        classes.append(classObj);
+    }
+
+    return classes;
+}
+
+bool DatabaseManager::createClass(const QString &className)
+{
+    QMutexLocker locker(&m_mutex);
+    QSqlDatabase db = getDatabase();
+    if (!db.open())
+        return false;
+
+    QSqlQuery query(db);
+    query.prepare("INSERT INTO classes (class_name) VALUES (:class_name)");
+    query.bindValue(":class_name", className);
+
+    if (!query.exec()) {
+        qWarning() << "Failed to create class:" << query.lastError().text();
+        return false;
+    }
+    return true;
+}
+
+bool DatabaseManager::deleteClass(int classId)
+{
+    QMutexLocker locker(&m_mutex);
+    QSqlDatabase db = getDatabase();
+    if (!db.open())
+        return false;
+
+    QSqlQuery query(db);
+    query.prepare("DELETE FROM classes WHERE class_id = :class_id");
+    query.bindValue(":class_id", classId);
+
+    return query.exec();
+}
+
+bool DatabaseManager::assignUserToClass(int userId, int classId)
+{
+    QMutexLocker locker(&m_mutex);
+    QSqlDatabase db = getDatabase();
+    if (!db.open())
+        return false;
+
+    QSqlQuery query(db);
+    query.prepare("INSERT INTO class_members (user_id, class_id) VALUES (:user_id, :class_id)");
+    query.bindValue(":user_id", userId);
+    query.bindValue(":class_id", classId);
+
+    return query.exec();
+}
+
+bool DatabaseManager::removeUserFromClass(int userId, int classId)
+{
+    QMutexLocker locker(&m_mutex);
+    QSqlDatabase db = getDatabase();
+    if (!db.open())
+        return false;
+
+    QSqlQuery query(db);
+    query.prepare("DELETE FROM class_members WHERE user_id = :user_id AND class_id = :class_id");
+    query.bindValue(":user_id", userId);
+    query.bindValue(":class_id", classId);
+
+    return query.exec();
+}
+
+QJsonArray DatabaseManager::getClassMembers(int classId)
+{
+    QJsonArray members;
+    QMutexLocker locker(&m_mutex);
+    QSqlDatabase db = getDatabase();
+    if (!db.open())
+        return members;
+
+    QSqlQuery query(db);
+    query.prepare("SELECT u.user_id, u.username, u.role FROM users u "
+                  "JOIN class_members cm ON u.user_id = cm.user_id "
+                  "WHERE cm.class_id = :class_id");
+    query.bindValue(":class_id", classId);
+
+    if (!query.exec()) {
+        return members;
+    }
+
+    while (query.next()) {
+        QJsonObject member;
+        member["user_id"] = query.value("user_id").toInt();
+        member["username"] = query.value("username").toString();
+        member["role"] = query.value("role").toString();
+        members.append(member);
+    }
+
+    return members;
+}
+
+QJsonArray DatabaseManager::getCoursesForClass(int classId)
+{
+    QJsonArray courses;
+    QMutexLocker locker(&m_mutex);
+    QSqlDatabase db = getDatabase();
+    if (!db.open())
+        return courses;
+
+    QSqlQuery query(db);
+    query.prepare("SELECT course_id, course_name FROM courses WHERE class_id = :class_id ORDER BY "
+                  "course_name");
+    query.bindValue(":class_id", classId);
+
+    if (!query.exec()) {
+        return courses;
+    }
+
+    while (query.next()) {
+        QJsonObject course;
+        course["course_id"] = query.value("course_id").toInt();
+        course["course_name"] = query.value("course_name").toString();
+        courses.append(course);
+    }
+
+    return courses;
+}
+
+bool DatabaseManager::createCourse(const QString &courseName, int classId)
+{
+    QMutexLocker locker(&m_mutex);
+    QSqlDatabase db = getDatabase();
+    if (!db.open())
+        return false;
+
+    QSqlQuery query(db);
+    query.prepare("INSERT INTO courses (course_name, class_id) VALUES (:course_name, :class_id)");
+    query.bindValue(":course_name", courseName);
+    query.bindValue(":class_id", classId);
+
+    if (!query.exec()) {
+        qWarning() << "Failed to create course:" << query.lastError().text();
+        return false;
+    }
+    return true;
+}
+
+bool DatabaseManager::deleteCourse(int courseId)
+{
+    QMutexLocker locker(&m_mutex);
+    QSqlDatabase db = getDatabase();
+    if (!db.open())
+        return false;
+
+    QSqlQuery query(db);
+    query.prepare("DELETE FROM courses WHERE course_id = :course_id");
+    query.bindValue(":course_id", courseId);
+
+    return query.exec();
+}
+
 QList<std::shared_ptr<CourseMaterial>> DatabaseManager::getAllMaterials()
 {
     QList<std::shared_ptr<CourseMaterial>> materials;
@@ -197,7 +402,8 @@ QList<std::shared_ptr<CourseMaterial>> DatabaseManager::getAllMaterials()
         return materials;
 
     QSqlQuery query(db);
-    query.prepare("SELECT material_id, title, type FROM course_materials ORDER BY material_id");
+    query.prepare("SELECT material_id, title, type, course_id, creator_id FROM course_materials "
+                  "ORDER BY material_id");
 
     if (!query.exec()) {
         return materials;
@@ -221,7 +427,8 @@ std::shared_ptr<CourseMaterial> DatabaseManager::getMaterialById(int materialId)
         return nullptr;
 
     QSqlQuery query(db);
-    query.prepare("SELECT material_id, title, type FROM course_materials WHERE material_id = :id");
+    query.prepare("SELECT material_id, title, type, course_id, creator_id FROM course_materials "
+                  "WHERE material_id = :id");
     query.bindValue(":id", materialId);
 
     if (!query.exec() || !query.next()) {
@@ -251,9 +458,11 @@ std::shared_ptr<CourseMaterial> DatabaseManager::createMaterialFromQuery(const Q
     int id = query.value("material_id").toInt();
     QString title = query.value("title").toString();
     QString type = query.value("type").toString();
+    int courseId = query.value("course_id").toInt();
+    int creatorId = query.value("creator_id").toInt();
 
     if (type == "lesson") {
-        auto lesson = std::make_shared<TextLesson>(id, title);
+        auto lesson = std::make_shared<TextLesson>(id, title, courseId, creatorId);
 
         // Load lesson content
         QSqlQuery contentQuery(db);
@@ -265,7 +474,12 @@ std::shared_ptr<CourseMaterial> DatabaseManager::createMaterialFromQuery(const Q
 
         return lesson;
     } else if (type == "quiz") {
-        return loadQuizDetails(id);
+        auto quiz = loadQuizDetails(id);
+        if (quiz) {
+            quiz->setCourseId(courseId);
+            quiz->setCreatorId(creatorId);
+        }
+        return quiz;
     }
 
     return nullptr;
@@ -354,7 +568,10 @@ std::shared_ptr<Question> DatabaseManager::createQuestionFromQuery(const QSqlQue
     return question;
 }
 
-bool DatabaseManager::createLesson(const QString &title, const QString &content)
+bool DatabaseManager::createLesson(const QString &title,
+                                   const QString &content,
+                                   int courseId,
+                                   int creatorId)
 {
     QMutexLocker locker(&m_mutex);
     QSqlDatabase db = getDatabase();
@@ -364,11 +581,14 @@ bool DatabaseManager::createLesson(const QString &title, const QString &content)
     db.transaction();
 
     QSqlQuery query(db);
-    query.prepare("INSERT INTO course_materials (title, type) VALUES (:title, 'lesson') RETURNING "
-                  "material_id");
+    query.prepare("INSERT INTO course_materials (title, type, course_id, creator_id) VALUES "
+                  "(:title, 'lesson', :course_id, :creator_id) RETURNING material_id");
     query.bindValue(":title", title);
+    query.bindValue(":course_id", courseId);
+    query.bindValue(":creator_id", creatorId);
 
     if (!query.exec() || !query.next()) {
+        qWarning() << "Failed to create lesson material entry:" << query.lastError().text();
         db.rollback();
         return false;
     }
@@ -380,6 +600,7 @@ bool DatabaseManager::createLesson(const QString &title, const QString &content)
     query.bindValue(":content", content);
 
     if (!query.exec()) {
+        qWarning() << "Failed to create text_lesson entry:" << query.lastError().text();
         db.rollback();
         return false;
     }
@@ -387,7 +608,9 @@ bool DatabaseManager::createLesson(const QString &title, const QString &content)
     return db.commit();
 }
 
-bool DatabaseManager::createQuizWithQuestions(const QJsonObject &quizData)
+bool DatabaseManager::createQuizWithQuestions(const QJsonObject &quizData,
+                                              int courseId,
+                                              int creatorId)
 {
     QMutexLocker locker(&m_mutex);
     QSqlDatabase db = getDatabase();
@@ -398,11 +621,14 @@ bool DatabaseManager::createQuizWithQuestions(const QJsonObject &quizData)
 
     // 1. Create course_material entry
     QSqlQuery query(db);
-    query.prepare(
-        "INSERT INTO course_materials (title, type) VALUES (:title, 'quiz') RETURNING material_id");
+    query.prepare("INSERT INTO course_materials (title, type, course_id, creator_id) VALUES "
+                  "(:title, 'quiz', :course_id, :creator_id) RETURNING material_id");
     query.bindValue(":title", quizData["title"].toString());
+    query.bindValue(":course_id", courseId);
+    query.bindValue(":creator_id", creatorId);
 
     if (!query.exec() || !query.next()) {
+        qWarning() << "Failed to create quiz material entry:" << query.lastError().text();
         db.rollback();
         return false;
     }
@@ -416,6 +642,7 @@ bool DatabaseManager::createQuizWithQuestions(const QJsonObject &quizData)
     query.bindValue(":feedback", quizData["feedback_type"].toString());
 
     if (!query.exec()) {
+        qWarning() << "Failed to create quizzes entry:" << query.lastError().text();
         db.rollback();
         return false;
     }
@@ -432,6 +659,7 @@ bool DatabaseManager::createQuizWithQuestions(const QJsonObject &quizData)
         query.bindValue(":type", qObj["question_type"].toString());
 
         if (!query.exec() || !query.next()) {
+            qWarning() << "Failed to create question entry:" << query.lastError().text();
             db.rollback();
             return false;
         }
@@ -448,6 +676,7 @@ bool DatabaseManager::createQuizWithQuestions(const QJsonObject &quizData)
                 query.bindValue(":correct", oObj["is_correct"].toBool());
 
                 if (!query.exec()) {
+                    qWarning() << "Failed to create option entry:" << query.lastError().text();
                     db.rollback();
                     return false;
                 }
@@ -456,6 +685,37 @@ bool DatabaseManager::createQuizWithQuestions(const QJsonObject &quizData)
     }
 
     return db.commit();
+}
+
+QJsonArray DatabaseManager::getMaterialsForCourse(int courseId)
+{
+    QJsonArray materials;
+    QMutexLocker locker(&m_mutex);
+    QSqlDatabase db = getDatabase();
+    if (!db.open())
+        return materials;
+
+    QSqlQuery query(db);
+    query.prepare("SELECT cm.material_id, cm.title, cm.type, u.username as instructor_name "
+                  "FROM course_materials cm "
+                  "LEFT JOIN users u ON cm.creator_id = u.user_id "
+                  "WHERE cm.course_id = :course_id ORDER BY cm.title");
+    query.bindValue(":course_id", courseId);
+
+    if (!query.exec()) {
+        return materials;
+    }
+
+    while (query.next()) {
+        QJsonObject material;
+        material["material_id"] = query.value("material_id").toInt();
+        material["title"] = query.value("title").toString();
+        material["type"] = query.value("type").toString();
+        material["instructor_name"] = query.value("instructor_name").toString();
+        materials.append(material);
+    }
+
+    return materials;
 }
 
 int DatabaseManager::createQuizAttempt(int quizId, int studentId, int attemptNumber)
@@ -767,15 +1027,20 @@ QJsonArray DatabaseManager::getStudentQuizAttempts(int studentId)
         return attempts;
 
     QSqlQuery query(db);
-    query.prepare("SELECT qa.*, cm.title, q.feedback_type "
+    query.prepare("SELECT qa.*, cm.title as quiz_title, q.feedback_type, c.course_id, "
+                  "c.course_name, cl.class_id, cl.class_name, u.username as instructor_name "
                   "FROM quiz_attempts qa "
                   "JOIN course_materials cm ON qa.quiz_id = cm.material_id "
                   "JOIN quizzes q ON qa.quiz_id = q.quiz_id "
+                  "LEFT JOIN courses c ON cm.course_id = c.course_id "
+                  "LEFT JOIN classes cl ON c.class_id = cl.class_id "
+                  "LEFT JOIN users u ON cm.creator_id = u.user_id "
                   "WHERE qa.student_id = :student_id "
                   "ORDER BY qa.submitted_at DESC");
     query.bindValue(":student_id", studentId);
 
     if (!query.exec()) {
+        qWarning() << "Failed to get student quiz attempts:" << query.lastError().text();
         return attempts;
     }
 
@@ -783,13 +1048,18 @@ QJsonArray DatabaseManager::getStudentQuizAttempts(int studentId)
         QJsonObject obj;
         obj["attempt_id"] = query.value("attempt_id").toInt();
         obj["quiz_id"] = query.value("quiz_id").toInt();
-        obj["quiz_title"] = query.value("title").toString();
+        obj["quiz_title"] = query.value("quiz_title").toString();
         obj["attempt_number"] = query.value("attempt_number").toInt();
         obj["status"] = query.value("status").toString();
         obj["auto_score"] = query.value("auto_score").toDouble();
         obj["final_score"] = query.value("final_score").toDouble();
         obj["submitted_at"] = query.value("submitted_at").toString();
         obj["feedback_type"] = query.value("feedback_type").toString();
+        obj["course_id"] = query.value("course_id").toInt();
+        obj["course_name"] = query.value("course_name").toString();
+        obj["class_id"] = query.value("class_id").toInt();
+        obj["class_name"] = query.value("class_name").toString();
+        obj["instructor_name"] = query.value("instructor_name").toString();
         attempts.append(obj);
     }
 
@@ -817,7 +1087,7 @@ bool DatabaseManager::finalizeAttempt(int attemptId, const QString &status, floa
     return query.exec();
 }
 
-QJsonArray DatabaseManager::getPendingAttempts()
+QJsonArray DatabaseManager::getPendingAttempts(int instructorId)
 {
     QJsonArray attempts;
     QMutexLocker locker(&m_mutex);
@@ -828,12 +1098,15 @@ QJsonArray DatabaseManager::getPendingAttempts()
     QSqlQuery query(db);
     query.prepare("SELECT qa.attempt_id, qa.quiz_id, qa.student_id, qa.attempt_number, "
                   "qa.auto_score, qa.total_auto_points, qa.total_manual_points, "
-                  "u.username, cm.title "
+                  "u.username, cm.title, c.course_name, cl.class_name "
                   "FROM quiz_attempts qa "
                   "JOIN users u ON qa.student_id = u.user_id "
                   "JOIN course_materials cm ON qa.quiz_id = cm.material_id "
-                  "WHERE qa.status = 'pending_manual_grading' "
+                  "LEFT JOIN courses c ON cm.course_id = c.course_id "
+                  "LEFT JOIN classes cl ON c.class_id = cl.class_id "
+                  "WHERE qa.status = 'pending_manual_grading' AND cm.creator_id = :instructor_id "
                   "ORDER BY qa.attempt_id");
+    query.bindValue(":instructor_id", instructorId);
 
     if (!query.exec()) {
         return attempts;
@@ -848,6 +1121,8 @@ QJsonArray DatabaseManager::getPendingAttempts()
         obj["attempt_number"] = query.value("attempt_number").toInt();
         obj["student_name"] = query.value("username").toString();
         obj["quiz_title"] = query.value("title").toString();
+        obj["course_name"] = query.value("course_name").toString();
+        obj["class_name"] = query.value("class_name").toString();
         obj["auto_score"] = query.value("auto_score").toDouble();
         obj["total_auto_points"] = query.value("total_auto_points").toInt();
         obj["total_manual_points"] = query.value("total_manual_points").toInt();
