@@ -67,6 +67,7 @@ void CourseManagementWidget::setupUi()
     m_contentLayout->addWidget(m_contentView);
     rightLayout->addWidget(m_contentGroup);
     splitter->addWidget(rightWidget);
+
     splitter->setStretchFactor(0, 1);
     splitter->setStretchFactor(1, 1);
 

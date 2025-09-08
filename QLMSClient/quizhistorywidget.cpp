@@ -46,6 +46,7 @@ void QuizHistoryWidget::setupUi()
     m_attemptsFilterWidget->setFilterOptions({"Name", "Instructor"});
     leftLayout->addWidget(m_attemptsFilterWidget);
     m_attemptsTreeWidget = new QTreeWidget(this);
+    m_attemptsTreeWidget->setColumnWidth(0, 350);
     m_attemptsTreeWidget->setHeaderLabels({"Name", "Score", "Status", "ID", "Instructor"});
     m_attemptsTreeWidget->setColumnHidden(3, true);
     m_attemptsTreeWidget->setColumnHidden(4, true);
@@ -62,6 +63,7 @@ void QuizHistoryWidget::setupUi()
     detailsLayout->addWidget(m_attemptDetailsText);
     rightLayout->addWidget(m_attemptDetailsGroup);
     splitter->addWidget(rightWidget);
+
     splitter->setStretchFactor(0, 1);
     splitter->setStretchFactor(1, 1);
 

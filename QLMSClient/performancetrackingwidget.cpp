@@ -46,9 +46,10 @@ void PerformanceTrackingWidget::setupUi()
     m_filterWidget->setFilterOptions({"Student", "Quiz", "Course"});
     leftLayout->addWidget(m_filterWidget);
     m_treeWidget = new QTreeWidget(this);
-    m_treeWidget->setColumnWidth(0, 350);
-    m_treeWidget->setHeaderLabels({"Name", "Type", "ID"});
-    m_treeWidget->setColumnHidden(2, true);
+    m_treeWidget->setColumnWidth(0, 250);
+    m_treeWidget->setHeaderLabels({"Name", "Score", "Attempt", "Type", "ID"});
+    m_treeWidget->setColumnHidden(3, true);
+    m_treeWidget->setColumnHidden(4, true);
     leftLayout->addWidget(m_treeWidget);
     splitter->addWidget(leftWidget);
 
@@ -62,6 +63,7 @@ void PerformanceTrackingWidget::setupUi()
     detailsLayout->addWidget(m_detailsTextEdit);
     rightLayout->addWidget(m_detailsGroup);
     splitter->addWidget(rightWidget);
+
     splitter->setStretchFactor(0, 1);
     splitter->setStretchFactor(1, 1);
 
@@ -94,12 +96,12 @@ void PerformanceTrackingWidget::onItemSelected()
     if (!item)
         return;
 
-    QString type = item->text(1);
+    QString type = item->text(3);
     clearDetailsArea();
 
     if (type == "class") {
         m_detailsGroup->setTitle(QString("Statistics for %1").arg(item->text(0)));
-        int classId = item->data(2, Qt::UserRole).toInt();
+        int classId = item->data(4, Qt::UserRole).toInt();
         QJsonObject data;
         data["class_id"] = classId;
         NetworkManager::instance()
@@ -116,7 +118,7 @@ void PerformanceTrackingWidget::onItemSelected()
             });
     } else if (type == "course") {
         m_detailsGroup->setTitle(QString("Statistics for %1").arg(item->text(0)));
-        int courseId = item->data(2, Qt::UserRole).toInt();
+        int courseId = item->data(4, Qt::UserRole).toInt();
         QJsonObject data;
         data["course_id"] = courseId;
         NetworkManager::instance()
@@ -132,7 +134,7 @@ void PerformanceTrackingWidget::onItemSelected()
                 }
             });
     } else if (type == "quiz") {
-        int quizId = item->data(2, Qt::UserRole).toInt();
+        int quizId = item->data(4, Qt::UserRole).toInt();
         QJsonObject data;
         data["quiz_id"] = quizId;
         NetworkManager::instance().sendCommand(
@@ -149,19 +151,17 @@ void PerformanceTrackingWidget::onItemSelected()
                                                                   'f',
                                                                   1)
                                                       + "%";
-                        attemptItem->setText(0,
-                                             QString("%1 (Attempt %2) - Score: %3")
-                                                 .arg(attempt["student_name"].toString())
-                                                 .arg(attempt["attempt_number"].toInt())
-                                                 .arg(scoreText));
-                        attemptItem->setText(1, "attempt");
-                        attemptItem->setData(2, Qt::UserRole, attempt["attempt_id"].toInt());
+                        attemptItem->setText(0, attempt["student_name"].toString());
+                        attemptItem->setText(1, scoreText);
+                        attemptItem->setText(2, QString::number(attempt["attempt_number"].toInt()));
+                        attemptItem->setText(3, "attempt");
+                        attemptItem->setData(4, Qt::UserRole, attempt["attempt_id"].toInt());
                     }
                     item->setExpanded(true);
                 }
             });
     } else if (type == "attempt") {
-        int attemptId = item->data(2, Qt::UserRole).toInt();
+        int attemptId = item->data(4, Qt::UserRole).toInt();
         QJsonObject data;
         data["attempt_id"] = attemptId;
         NetworkManager::instance().sendCommand("GET_ATTEMPT_DETAILS",
@@ -180,8 +180,8 @@ void PerformanceTrackingWidget::handleClassesResponse(const QJsonObject &respons
             QJsonObject classObj = val.toObject();
             auto *classItem = new QTreeWidgetItem(m_treeWidget);
             classItem->setText(0, classObj["class_name"].toString());
-            classItem->setText(1, "class");
-            classItem->setData(2, Qt::UserRole, classObj["class_id"].toInt());
+            classItem->setText(3, "class");
+            classItem->setData(4, Qt::UserRole, classObj["class_id"].toInt());
 
             QJsonObject data;
             data["class_id"] = classObj["class_id"].toInt();
@@ -205,8 +205,8 @@ void PerformanceTrackingWidget::handleCoursesResponse(const QJsonObject &respons
             QJsonObject courseObj = val.toObject();
             auto *courseItem = new QTreeWidgetItem(classItem);
             courseItem->setText(0, courseObj["course_name"].toString());
-            courseItem->setText(1, "course");
-            courseItem->setData(2, Qt::UserRole, courseObj["course_id"].toInt());
+            courseItem->setText(3, "course");
+            courseItem->setData(4, Qt::UserRole, courseObj["course_id"].toInt());
 
             QJsonObject data;
             data["course_id"] = courseObj["course_id"].toInt();
@@ -231,8 +231,8 @@ void PerformanceTrackingWidget::handleMaterialsResponse(const QJsonObject &respo
             if (materialObj["type"].toString() == "quiz") {
                 auto *materialItem = new QTreeWidgetItem(courseItem);
                 materialItem->setText(0, materialObj["title"].toString());
-                materialItem->setText(1, "quiz");
-                materialItem->setData(2, Qt::UserRole, materialObj["material_id"].toInt());
+                materialItem->setText(3, "quiz");
+                materialItem->setData(4, Qt::UserRole, materialObj["material_id"].toInt());
             }
         }
     }
@@ -250,9 +250,9 @@ void PerformanceTrackingWidget::handleAttemptDetailsResponse(const QJsonObject &
 
 void PerformanceTrackingWidget::displayAttemptDetails(const QJsonObject &attemptData)
 {
-    m_detailsGroup->setTitle(QString("Details for %1's attempt at %2")
-                                 .arg(m_treeWidget->currentItem()->parent()->text(0),
-                                      attemptData["quiz_title"].toString()));
+    m_detailsGroup->setTitle(
+        QString("Details for %1's attempt at %2")
+            .arg(m_treeWidget->currentItem()->text(0), attemptData["quiz_title"].toString()));
     QString detailsText;
     detailsText += QString("Attempt #%1\n").arg(attemptData["attempt_number"].toInt());
     detailsText += QString("Status: %1\n\n")
@@ -329,7 +329,7 @@ bool PerformanceTrackingWidget::applyFilterRecursive(QTreeWidgetItem *item,
     }
 
     bool selfMatches = false;
-    QString itemType = item->text(1); // Type is in column 1
+    QString itemType = item->text(3); // Type is in column 3
     if ((filterBy == "Student" && itemType == "attempt")
         || (filterBy == "Quiz" && itemType == "quiz")
         || (filterBy == "Course" && itemType == "course")) {

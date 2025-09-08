@@ -5,6 +5,7 @@
 #include <QCheckBox>
 #include <QGroupBox>
 #include <QHBoxLayout>
+#include <QHeaderView>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMessageBox>
@@ -52,6 +53,7 @@ void CourseListWidget::setupUi()
     leftLayout->addWidget(m_materialsFilterWidget);
     m_materialsTreeWidget = new QTreeWidget(this);
     m_materialsTreeWidget->setHeaderLabels({"Name", "Type", "ID", "Instructor"});
+    m_materialsTreeWidget->setColumnWidth(0, 350); // Set the fixed width for the "Name" column
     m_materialsTreeWidget->setColumnHidden(2, true);
     m_materialsTreeWidget->setColumnHidden(3, true);
     leftLayout->addWidget(m_materialsTreeWidget);
@@ -74,8 +76,10 @@ void CourseListWidget::setupUi()
     m_contentLayout->addWidget(m_submitQuizButton);
     rightLayout->addWidget(m_contentGroup);
     splitter->addWidget(rightWidget);
-    splitter->setStretchFactor(0, 1);
-    splitter->setStretchFactor(1, 1);
+
+    // Set initial sizes to be equal. The splitter will respect this as much as possible
+    // while honoring the minimum size constraints of its widgets (like the 350px column).
+    splitter->setSizes({1, 1});
 
     mainLayout->addWidget(splitter);
 

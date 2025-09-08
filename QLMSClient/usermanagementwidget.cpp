@@ -52,7 +52,6 @@ void UserManagementWidget::setupUi()
     m_tableWidget->setHorizontalHeaderLabels(QStringList() << "ID" << "Username" << "Role");
     m_tableWidget->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_tableWidget->setAlternatingRowColors(true);
-    m_tableWidget->horizontalHeader()->setStretchLastSection(true);
     m_tableWidget->setColumnHidden(0, true); // Hide the ID column
     mainLayout->addWidget(m_tableWidget);
 
@@ -192,7 +191,12 @@ void UserManagementWidget::populateTable(const QJsonArray &users)
         m_tableWidget->setItem(row, 2, new QTableWidgetItem(user["role"].toString()));
     }
 
-    m_tableWidget->resizeColumnsToContents();
+    // Resize all columns except the last one to their contents
+    for (int i = 0; i < m_tableWidget->columnCount() - 1; ++i) {
+        m_tableWidget->resizeColumnToContents(i);
+    }
+    // Ensure the last column stretches to fill the remaining space
+    m_tableWidget->horizontalHeader()->setStretchLastSection(true);
 }
 
 void UserManagementWidget::applyFilter()
