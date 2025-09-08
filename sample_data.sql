@@ -16,8 +16,8 @@ INSERT INTO users (user_id, username, password_hash, role) VALUES
 
 -- Insert classes
 INSERT INTO classes (class_id, class_name) VALUES
-(1, 'Fall 2025 Computer Science'),
-(2, 'Spring 2026 Mathematics');
+(1, '2025-2026 Computer Science'),
+(2, '2025-2026 Mathematics');
 
 -- Insert courses
 INSERT INTO courses (course_id, course_name, class_id) VALUES
