@@ -82,11 +82,22 @@ void CourseManagementWidget::setupUi()
 
 void CourseManagementWidget::onRefresh()
 {
+    // Disconnect the signal to prevent onItemSelected from being called during the refresh
+    disconnect(m_materialsTreeWidget,
+               &QTreeWidget::itemSelectionChanged,
+               this,
+               &CourseManagementWidget::onItemSelected);
+
     m_materialsTreeWidget->clear();
     NetworkManager::instance().sendCommand("GET_ALL_CLASSES",
                                            QJsonObject(),
                                            [this](const QJsonObject &response) {
                                                handleClassesResponse(response);
+                                               // Reconnect the signal now that the tree is populated
+                                               connect(m_materialsTreeWidget,
+                                                       &QTreeWidget::itemSelectionChanged,
+                                                       this,
+                                                       &CourseManagementWidget::onItemSelected);
                                            });
 }
 
@@ -237,6 +248,7 @@ void CourseManagementWidget::handleDeleteMaterialResponse(const QJsonObject &res
 {
     if (response["type"].toString() == "OK") {
         QMessageBox::information(this, "Success", "Material deleted successfully.");
+        clearContentArea();
         onRefresh();
     } else {
         QMessageBox::critical(this,
