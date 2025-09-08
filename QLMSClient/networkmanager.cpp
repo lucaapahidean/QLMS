@@ -192,7 +192,8 @@ void NetworkManager::onSocketError(QAbstractSocket::SocketError error)
 
 void NetworkManager::processMessage(const QJsonObject &message)
 {
-    qDebug() << "Received message:" << QJsonDocument(message).toJson(QJsonDocument::Compact);
+    qDebug() << "Received message:"
+             << QJsonDocument(message).toJson(QJsonDocument::Indented).constData();
 
     emit messageReceived(message);
 
@@ -215,7 +216,7 @@ void NetworkManager::sendMessage(const QJsonObject &message)
     QJsonDocument doc(message);
     QByteArray data = doc.toJson(QJsonDocument::Compact) + "\n";
 
-    qDebug() << "Sending message:" << doc.toJson(QJsonDocument::Compact);
+    qDebug() << "Sending message:" << doc.toJson(QJsonDocument::Indented).constData();
 
     qint64 written = m_socket->write(data);
     if (written == -1) {
