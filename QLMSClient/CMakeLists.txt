@@ -25,6 +25,7 @@ qt_add_executable(QLMSClient
     performancetrackingwidget.h performancetrackingwidget.cpp
     filterwidget.h filterwidget.cpp
     quizhistorywidget.h quizhistorywidget.cpp
+    usersearchdialog.h usersearchdialog.cpp
 )
 
 target_link_libraries(QLMSClient

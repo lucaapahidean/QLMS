@@ -1,5 +1,6 @@
 #include "classmanagementwidget.h"
 #include "networkmanager.h"
+#include "usersearchdialog.h"
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QInputDialog>
@@ -242,20 +243,23 @@ void ClassManagementWidget::onAssignUser()
         return;
 
     int classId = m_classes[classRow].toObject()["class_id"].toInt();
-    bool ok;
-    int userId = QInputDialog::getInt(this, "Assign User", "User ID:", 0, 0, 100000, 1, &ok);
-    if (ok) {
-        QJsonObject data;
-        data["user_id"] = userId;
-        data["class_id"] = classId;
-        NetworkManager::instance()
-            .sendCommand("ASSIGN_USER_TO_CLASS", data, [this](const QJsonObject &response) {
-                if (response["type"].toString() == "OK") {
-                    onClassSelected();
-                } else {
-                    QMessageBox::critical(this, "Error", response["message"].toString());
-                }
-            });
+
+    UserSearchDialog dialog(this);
+    if (dialog.exec() == QDialog::Accepted) {
+        int userId = dialog.selectedUserId();
+        if (userId != -1) {
+            QJsonObject data;
+            data["user_id"] = userId;
+            data["class_id"] = classId;
+            NetworkManager::instance()
+                .sendCommand("ASSIGN_USER_TO_CLASS", data, [this](const QJsonObject &response) {
+                    if (response["type"].toString() == "OK") {
+                        onClassSelected();
+                    } else {
+                        QMessageBox::critical(this, "Error", response["message"].toString());
+                    }
+                });
+        }
     }
 }
 
