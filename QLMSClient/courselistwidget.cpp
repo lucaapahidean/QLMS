@@ -1,4 +1,5 @@
 #include "courselistwidget.h"
+#include "filterwidget.h"
 #include "networkmanager.h"
 #include <QButtonGroup>
 #include <QCheckBox>
@@ -29,7 +30,6 @@ void CourseListWidget::setupUi()
 {
     auto *mainLayout = new QVBoxLayout(this);
 
-    // Create tab widget for materials and attempts
     m_tabWidget = new QTabWidget(this);
 
     // Materials tab
@@ -44,9 +44,9 @@ void CourseListWidget::setupUi()
     font.setBold(true);
     materialsLabel->setFont(font);
     leftLayout->addWidget(materialsLabel);
-    m_materialsFilterEdit = new QLineEdit(this);
-    m_materialsFilterEdit->setPlaceholderText("Filter by name or instructor...");
-    leftLayout->addWidget(m_materialsFilterEdit);
+    m_materialsFilterWidget = new FilterWidget(this);
+    m_materialsFilterWidget->setFilterOptions({"Name", "Instructor"});
+    leftLayout->addWidget(m_materialsFilterWidget);
     m_materialsTreeWidget = new QTreeWidget(this);
     m_materialsTreeWidget->setHeaderLabels({"Name", "Type", "ID", "Instructor"});
     m_materialsTreeWidget->setColumnHidden(2, true);
@@ -87,12 +87,13 @@ void CourseListWidget::setupUi()
     auto *attemptsLabel = new QLabel("Your Quiz Attempts", this);
     attemptsLabel->setFont(font);
     attemptsLeftLayout->addWidget(attemptsLabel);
-    m_attemptsFilterEdit = new QLineEdit(this);
-    m_attemptsFilterEdit->setPlaceholderText("Filter by quiz name or instructor...");
-    attemptsLeftLayout->addWidget(m_attemptsFilterEdit);
+    m_attemptsFilterWidget = new FilterWidget(this);
+    m_attemptsFilterWidget->setFilterOptions({"Quiz Name", "Instructor"});
+    attemptsLeftLayout->addWidget(m_attemptsFilterWidget);
     m_attemptsTreeWidget = new QTreeWidget(this);
-    m_attemptsTreeWidget->setHeaderLabels({"Name", "Details", "ID"});
+    m_attemptsTreeWidget->setHeaderLabels({"Name", "Details", "ID", "Instructor"});
     m_attemptsTreeWidget->setColumnHidden(2, true);
+    m_attemptsTreeWidget->setColumnHidden(3, true);
     attemptsLeftLayout->addWidget(m_attemptsTreeWidget);
     m_refreshAttemptsButton = new QPushButton("Refresh", this);
     attemptsLeftLayout->addWidget(m_refreshAttemptsButton);
@@ -127,12 +128,12 @@ void CourseListWidget::setupUi()
             &QTreeWidget::itemClicked,
             this,
             &CourseListWidget::onAttemptSelected);
-    connect(m_materialsFilterEdit,
-            &QLineEdit::textChanged,
+    connect(m_materialsFilterWidget,
+            &FilterWidget::filterChanged,
             this,
             &CourseListWidget::applyMaterialsFilter);
-    connect(m_attemptsFilterEdit,
-            &QLineEdit::textChanged,
+    connect(m_attemptsFilterWidget,
+            &FilterWidget::filterChanged,
             this,
             &CourseListWidget::applyAttemptsFilter);
 }
@@ -544,50 +545,39 @@ void CourseListWidget::populateAttemptsList()
     m_attemptsTreeWidget->expandAll();
 }
 
-void CourseListWidget::applyMaterialsFilter(const QString &text)
+void CourseListWidget::applyMaterialsFilter()
 {
     for (int i = 0; i < m_materialsTreeWidget->topLevelItemCount(); ++i) {
-        QTreeWidgetItem *classItem = m_materialsTreeWidget->topLevelItem(i);
-        bool classVisible = false;
-        for (int j = 0; j < classItem->childCount(); ++j) {
-            QTreeWidgetItem *courseItem = classItem->child(j);
-            bool courseVisible = false;
-            for (int k = 0; k < courseItem->childCount(); ++k) {
-                QTreeWidgetItem *materialItem = courseItem->child(k);
-                bool match = materialItem->text(0).contains(text, Qt::CaseInsensitive)
-                             || materialItem->text(3).contains(text, Qt::CaseInsensitive);
-                materialItem->setHidden(!match);
-                if (match)
-                    courseVisible = true;
-            }
-            courseItem->setHidden(!courseVisible);
-            if (courseVisible)
-                classVisible = true;
-        }
-        classItem->setHidden(!classVisible);
+        applyFilterRecursive(m_materialsTreeWidget->topLevelItem(i),
+                             m_materialsFilterWidget->filterText(),
+                             m_materialsFilterWidget->currentFilterOption());
     }
 }
 
-void CourseListWidget::applyAttemptsFilter(const QString &text)
+void CourseListWidget::applyAttemptsFilter()
 {
     for (int i = 0; i < m_attemptsTreeWidget->topLevelItemCount(); ++i) {
-        QTreeWidgetItem *classItem = m_attemptsTreeWidget->topLevelItem(i);
-        bool classVisible = false;
-        for (int j = 0; j < classItem->childCount(); ++j) {
-            QTreeWidgetItem *courseItem = classItem->child(j);
-            bool courseVisible = false;
-            for (int k = 0; k < courseItem->childCount(); ++k) {
-                QTreeWidgetItem *quizItem = courseItem->child(k);
-                bool match = quizItem->text(0).contains(text, Qt::CaseInsensitive)
-                             || quizItem->text(3).contains(text, Qt::CaseInsensitive);
-                quizItem->setHidden(!match);
-                if (match)
-                    courseVisible = true;
-            }
-            courseItem->setHidden(!courseVisible);
-            if (courseVisible)
-                classVisible = true;
-        }
-        classItem->setHidden(!classVisible);
+        applyFilterRecursive(m_attemptsTreeWidget->topLevelItem(i),
+                             m_attemptsFilterWidget->filterText(),
+                             m_attemptsFilterWidget->currentFilterOption());
     }
+}
+
+bool CourseListWidget::applyFilterRecursive(QTreeWidgetItem *item,
+                                            const QString &text,
+                                            const QString &filterBy)
+{
+    bool anyChildMatches = false;
+    for (int i = 0; i < item->childCount(); ++i) {
+        if (applyFilterRecursive(item->child(i), text, filterBy)) {
+            anyChildMatches = true;
+        }
+    }
+
+    int column = (filterBy == "Name" || filterBy == "Quiz Name") ? 0 : 3;
+    bool selfMatches = item->text(column).contains(text, Qt::CaseInsensitive);
+    bool shouldBeVisible = selfMatches || anyChildMatches;
+    item->setHidden(!shouldBeVisible);
+
+    return shouldBeVisible;
 }

@@ -23,6 +23,7 @@ qt_add_executable(QLMSClient
     materialcreationwizard.h materialcreationwizard.cpp
     classmanagementwidget.h classmanagementwidget.cpp
     performancetrackingwidget.h performancetrackingwidget.cpp
+    filterwidget.h filterwidget.cpp
 )
 
 target_link_libraries(QLMSClient

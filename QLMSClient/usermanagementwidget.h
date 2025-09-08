@@ -9,6 +9,8 @@ class QTableWidget;
 class QPushButton;
 QT_END_NAMESPACE
 
+class FilterWidget;
+
 class UserManagementWidget : public QWidget
 {
     Q_OBJECT
@@ -21,11 +23,13 @@ private slots:
     void onAddUserClicked();
     void onDeleteUserClicked();
     void handleUsersResponse(const QJsonObject &response);
+    void applyFilter();
 
 private:
     void setupUi();
     void populateTable(const QJsonArray &users);
 
+    FilterWidget *m_filterWidget;
     QTableWidget *m_tableWidget;
     QPushButton *m_refreshButton;
     QPushButton *m_addButton;

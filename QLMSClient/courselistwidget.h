@@ -16,6 +16,8 @@ class QTabWidget;
 class QLineEdit;
 QT_END_NAMESPACE
 
+class FilterWidget;
+
 class CourseListWidget : public QWidget
 {
     Q_OBJECT
@@ -35,8 +37,8 @@ private slots:
     void handleQuizDataResponse(const QJsonObject &response);
     void handleQuizSubmissionResponse(const QJsonObject &response);
     void handleAttemptDetailsResponse(const QJsonObject &response);
-    void applyMaterialsFilter(const QString &text);
-    void applyAttemptsFilter(const QString &text);
+    void applyMaterialsFilter();
+    void applyAttemptsFilter();
 
 private:
     void setupUi();
@@ -45,6 +47,7 @@ private:
     void displayAttemptDetails(const QJsonObject &attemptData);
     void clearContentArea();
     void populateAttemptsList();
+    bool applyFilterRecursive(QTreeWidgetItem *item, const QString &text, const QString &filterBy);
 
     int m_studentId;
     QJsonObject m_currentQuiz;
@@ -54,9 +57,9 @@ private:
     QTabWidget *m_tabWidget;
 
     // Materials tab widgets
+    FilterWidget *m_materialsFilterWidget;
     QTreeWidget *m_materialsTreeWidget;
     QPushButton *m_refreshButton;
-    QLineEdit *m_materialsFilterEdit;
     QGroupBox *m_contentGroup;
     QVBoxLayout *m_contentLayout;
     QTextEdit *m_lessonTextEdit;
@@ -64,9 +67,9 @@ private:
     QPushButton *m_submitQuizButton;
 
     // Quiz attempts tab widgets
+    FilterWidget *m_attemptsFilterWidget;
     QTreeWidget *m_attemptsTreeWidget;
     QPushButton *m_refreshAttemptsButton;
-    QLineEdit *m_attemptsFilterEdit;
     QGroupBox *m_attemptDetailsGroup;
     QVBoxLayout *m_attemptDetailsLayout;
     QTextEdit *m_attemptDetailsText;

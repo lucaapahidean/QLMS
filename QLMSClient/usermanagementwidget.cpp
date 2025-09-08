@@ -1,4 +1,5 @@
 #include "usermanagementwidget.h"
+#include "filterwidget.h"
 #include "networkmanager.h"
 #include <QComboBox>
 #include <QDialog>
@@ -40,6 +41,11 @@ void UserManagementWidget::setupUi()
 
     layout->addLayout(headerLayout);
 
+    // Filter
+    m_filterWidget = new FilterWidget(this);
+    m_filterWidget->setFilterOptions({"Username", "Role"});
+    layout->addWidget(m_filterWidget);
+
     // Table
     m_tableWidget = new QTableWidget(this);
     m_tableWidget->setColumnCount(3);
@@ -47,6 +53,7 @@ void UserManagementWidget::setupUi()
     m_tableWidget->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_tableWidget->setAlternatingRowColors(true);
     m_tableWidget->horizontalHeader()->setStretchLastSection(true);
+    m_tableWidget->setColumnHidden(0, true); // Hide the ID column
     layout->addWidget(m_tableWidget);
 
     // Buttons
@@ -69,6 +76,7 @@ void UserManagementWidget::setupUi()
     connect(m_tableWidget, &QTableWidget::itemSelectionChanged, this, [this]() {
         m_deleteButton->setEnabled(m_tableWidget->currentRow() >= 0);
     });
+    connect(m_filterWidget, &FilterWidget::filterChanged, this, &UserManagementWidget::applyFilter);
 }
 
 void UserManagementWidget::onRefreshClicked()
@@ -185,4 +193,17 @@ void UserManagementWidget::populateTable(const QJsonArray &users)
     }
 
     m_tableWidget->resizeColumnsToContents();
+}
+
+void UserManagementWidget::applyFilter()
+{
+    QString filterText = m_filterWidget->filterText();
+    QString filterColumn = m_filterWidget->currentFilterOption();
+    int column = (filterColumn == "Username") ? 1 : 2;
+
+    for (int i = 0; i < m_tableWidget->rowCount(); ++i) {
+        bool match = m_tableWidget->item(i, column)->text().contains(filterText,
+                                                                     Qt::CaseInsensitive);
+        m_tableWidget->setRowHidden(i, !match);
+    }
 }

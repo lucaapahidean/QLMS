@@ -1,4 +1,5 @@
 #include "performancetrackingwidget.h"
+#include "filterwidget.h"
 #include "networkmanager.h"
 #include <QGroupBox>
 #include <QHBoxLayout>
@@ -34,9 +35,9 @@ void PerformanceTrackingWidget::setupUi()
     titleLabel->setFont(font);
     leftLayout->addWidget(titleLabel);
 
-    m_filterEdit = new QLineEdit(this);
-    m_filterEdit->setPlaceholderText("Filter by student, quiz, course...");
-    leftLayout->addWidget(m_filterEdit);
+    m_filterWidget = new FilterWidget(this);
+    m_filterWidget->setFilterOptions({"Student", "Quiz", "Course"});
+    leftLayout->addWidget(m_filterWidget);
 
     m_treeWidget = new QTreeWidget(this);
     m_treeWidget->setHeaderLabels({"Name", "Type", "ID"});
@@ -72,7 +73,10 @@ void PerformanceTrackingWidget::setupUi()
             &QTreeWidget::itemClicked,
             this,
             &PerformanceTrackingWidget::onItemSelected);
-    connect(m_filterEdit, &QLineEdit::textChanged, this, &PerformanceTrackingWidget::applyFilter);
+    connect(m_filterWidget,
+            &FilterWidget::filterChanged,
+            this,
+            &PerformanceTrackingWidget::applyFilter);
 }
 
 void PerformanceTrackingWidget::onRefresh()
@@ -305,10 +309,10 @@ void PerformanceTrackingWidget::clearDetailsArea()
     m_detailsTextEdit->clear();
 }
 
-void PerformanceTrackingWidget::applyFilter(const QString &text)
+void PerformanceTrackingWidget::applyFilter()
 {
     for (int i = 0; i < m_treeWidget->topLevelItemCount(); ++i) {
-        applyFilterRecursive(m_treeWidget->topLevelItem(i), text);
+        applyFilterRecursive(m_treeWidget->topLevelItem(i), m_filterWidget->filterText());
     }
 }
 

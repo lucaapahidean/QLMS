@@ -8,11 +8,12 @@
 QT_BEGIN_NAMESPACE
 class QTreeWidget;
 class QTreeWidgetItem;
-class QLineEdit;
 class QTextEdit;
 class QPushButton;
 class QGroupBox;
 QT_END_NAMESPACE
+
+class FilterWidget;
 
 class PerformanceTrackingWidget : public QWidget
 {
@@ -28,7 +29,7 @@ private slots:
     void handleCoursesResponse(const QJsonObject &response, QTreeWidgetItem *classItem);
     void handleMaterialsResponse(const QJsonObject &response, QTreeWidgetItem *courseItem);
     void handleAttemptDetailsResponse(const QJsonObject &response);
-    void applyFilter(const QString &text);
+    void applyFilter();
 
 private:
     void setupUi();
@@ -39,9 +40,9 @@ private:
     int m_instructorId;
 
     // UI Elements
+    FilterWidget *m_filterWidget;
     QTreeWidget *m_treeWidget;
     QPushButton *m_refreshButton;
-    QLineEdit *m_filterEdit;
     QGroupBox *m_detailsGroup;
     QTextEdit *m_detailsTextEdit;
 };
