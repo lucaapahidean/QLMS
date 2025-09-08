@@ -22,47 +22,45 @@ PerformanceTrackingWidget::PerformanceTrackingWidget(int instructorId, QWidget *
 
 void PerformanceTrackingWidget::setupUi()
 {
-    auto *mainLayout = new QHBoxLayout(this);
+    auto *mainLayout = new QVBoxLayout(this);
+
+    // Header
+    auto *headerLayout = new QHBoxLayout();
+    auto *titleLabel = new QLabel("Student Performance", this);
+    QFont font = titleLabel->font();
+    font.setPointSize(14);
+    font.setBold(true);
+    titleLabel->setFont(font);
+    headerLayout->addWidget(titleLabel);
+    headerLayout->addStretch();
+    m_refreshButton = new QPushButton("Refresh", this);
+    headerLayout->addWidget(m_refreshButton);
+    mainLayout->addLayout(headerLayout);
+
     auto *splitter = new QSplitter(Qt::Horizontal, this);
 
     // Left panel
     auto *leftWidget = new QWidget(this);
     auto *leftLayout = new QVBoxLayout(leftWidget);
-
-    auto *titleLabel = new QLabel("Student Performance", this);
-    QFont font = titleLabel->font();
-    font.setBold(true);
-    titleLabel->setFont(font);
-    leftLayout->addWidget(titleLabel);
-
     m_filterWidget = new FilterWidget(this);
     m_filterWidget->setFilterOptions({"Student", "Quiz", "Course"});
     leftLayout->addWidget(m_filterWidget);
-
     m_treeWidget = new QTreeWidget(this);
     m_treeWidget->setHeaderLabels({"Name", "Type", "ID"});
     m_treeWidget->setColumnHidden(2, true);
     leftLayout->addWidget(m_treeWidget);
-
-    m_refreshButton = new QPushButton("Refresh", this);
-    leftLayout->addWidget(m_refreshButton);
-
     splitter->addWidget(leftWidget);
 
     // Right panel
     auto *rightWidget = new QWidget(this);
     auto *rightLayout = new QVBoxLayout(rightWidget);
-
-    m_detailsGroup = new QGroupBox("Select a student's attempt to view details", this);
+    m_detailsGroup = new QGroupBox("Select an item to view details", this);
     auto *detailsLayout = new QVBoxLayout(m_detailsGroup);
-
     m_detailsTextEdit = new QTextEdit(this);
     m_detailsTextEdit->setReadOnly(true);
     detailsLayout->addWidget(m_detailsTextEdit);
-
     rightLayout->addWidget(m_detailsGroup);
     splitter->addWidget(rightWidget);
-
     splitter->setStretchFactor(0, 1);
     splitter->setStretchFactor(1, 2);
 

@@ -24,7 +24,7 @@ UserManagementWidget::UserManagementWidget(QWidget *parent)
 
 void UserManagementWidget::setupUi()
 {
-    auto *layout = new QVBoxLayout(this);
+    auto *mainLayout = new QVBoxLayout(this);
 
     // Header
     auto *headerLayout = new QHBoxLayout();
@@ -39,12 +39,12 @@ void UserManagementWidget::setupUi()
     m_refreshButton = new QPushButton("Refresh", this);
     headerLayout->addWidget(m_refreshButton);
 
-    layout->addLayout(headerLayout);
+    mainLayout->addLayout(headerLayout);
 
     // Filter
     m_filterWidget = new FilterWidget(this);
     m_filterWidget->setFilterOptions({"Username", "Role"});
-    layout->addWidget(m_filterWidget);
+    mainLayout->addWidget(m_filterWidget);
 
     // Table
     m_tableWidget = new QTableWidget(this);
@@ -54,7 +54,7 @@ void UserManagementWidget::setupUi()
     m_tableWidget->setAlternatingRowColors(true);
     m_tableWidget->horizontalHeader()->setStretchLastSection(true);
     m_tableWidget->setColumnHidden(0, true); // Hide the ID column
-    layout->addWidget(m_tableWidget);
+    mainLayout->addWidget(m_tableWidget);
 
     // Buttons
     auto *buttonLayout = new QHBoxLayout();
@@ -67,7 +67,7 @@ void UserManagementWidget::setupUi()
     m_deleteButton->setEnabled(false);
     buttonLayout->addWidget(m_deleteButton);
 
-    layout->addLayout(buttonLayout);
+    mainLayout->addLayout(buttonLayout);
 
     // Connect signals
     connect(m_refreshButton, &QPushButton::clicked, this, &UserManagementWidget::onRefreshClicked);

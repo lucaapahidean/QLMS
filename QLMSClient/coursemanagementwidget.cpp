@@ -22,47 +22,48 @@ CourseManagementWidget::CourseManagementWidget(QWidget *parent)
 
 void CourseManagementWidget::setupUi()
 {
-    auto *mainLayout = new QHBoxLayout(this);
+    auto *mainLayout = new QVBoxLayout(this);
+
+    // Header
+    auto *headerLayout = new QHBoxLayout();
+    auto *titleLabel = new QLabel("Course Management", this);
+    QFont font = titleLabel->font();
+    font.setPointSize(14);
+    font.setBold(true);
+    titleLabel->setFont(font);
+    headerLayout->addWidget(titleLabel);
+    headerLayout->addStretch();
+    m_refreshButton = new QPushButton("Refresh", this);
+    headerLayout->addWidget(m_refreshButton);
+    mainLayout->addLayout(headerLayout);
+
     auto *splitter = new QSplitter(Qt::Horizontal, this);
 
-    // Left panel - Materials tree
+    // Left panel
     auto *leftWidget = new QWidget(this);
     auto *leftLayout = new QVBoxLayout(leftWidget);
-
-    auto *materialsLabel = new QLabel("Course Materials", this);
-    QFont font = materialsLabel->font();
-    font.setBold(true);
-    materialsLabel->setFont(font);
-    leftLayout->addWidget(materialsLabel);
-
+    leftLayout->addWidget(new QLabel("Course Materials", this));
     m_materialsTreeWidget = new QTreeWidget(this);
     m_materialsTreeWidget->setHeaderLabels({"Name", "Type", "ID"});
     m_materialsTreeWidget->setColumnHidden(2, true); // Hide ID column
     leftLayout->addWidget(m_materialsTreeWidget);
-
     auto *buttonLayout = new QHBoxLayout();
-    m_refreshButton = new QPushButton("Refresh", this);
     m_addButton = new QPushButton("Add Material...", this);
     m_deleteButton = new QPushButton("Delete Selected", this);
     m_deleteButton->setEnabled(false);
-    buttonLayout->addWidget(m_refreshButton);
     buttonLayout->addWidget(m_addButton);
     buttonLayout->addWidget(m_deleteButton);
     leftLayout->addLayout(buttonLayout);
-
     splitter->addWidget(leftWidget);
 
-    // Right panel - Content area
+    // Right panel
     auto *rightWidget = new QWidget(this);
     auto *rightLayout = new QVBoxLayout(rightWidget);
-
     m_contentGroup = new QGroupBox("Select a material to view its content", this);
     m_contentLayout = new QVBoxLayout(m_contentGroup);
-
     m_contentView = new QTextEdit(this);
     m_contentView->setReadOnly(true);
     m_contentLayout->addWidget(m_contentView);
-
     rightLayout->addWidget(m_contentGroup);
     splitter->addWidget(rightWidget);
     splitter->setStretchFactor(0, 1);

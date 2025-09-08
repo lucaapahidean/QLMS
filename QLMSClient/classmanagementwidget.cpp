@@ -21,6 +21,8 @@ ClassManagementWidget::ClassManagementWidget(QWidget *parent)
 void ClassManagementWidget::setupUi()
 {
     auto *mainLayout = new QVBoxLayout(this);
+
+    // Header
     auto *headerLayout = new QHBoxLayout();
     auto *titleLabel = new QLabel("Class Management", this);
     QFont font = titleLabel->font();
@@ -35,6 +37,7 @@ void ClassManagementWidget::setupUi()
 
     auto *splitter = new QSplitter(Qt::Horizontal, this);
 
+    // Left Panel
     auto *leftPanel = new QWidget(this);
     auto *leftLayout = new QVBoxLayout(leftPanel);
     leftLayout->addWidget(new QLabel("Classes", this));
@@ -48,6 +51,7 @@ void ClassManagementWidget::setupUi()
     leftLayout->addLayout(classButtons);
     splitter->addWidget(leftPanel);
 
+    // Middle Panel
     auto *middlePanel = new QWidget(this);
     auto *middleLayout = new QVBoxLayout(middlePanel);
     middleLayout->addWidget(new QLabel("Courses", this));
@@ -61,6 +65,7 @@ void ClassManagementWidget::setupUi()
     middleLayout->addLayout(courseButtons);
     splitter->addWidget(middlePanel);
 
+    // Right Panel
     auto *rightPanel = new QWidget(this);
     auto *rightLayout = new QVBoxLayout(rightPanel);
     rightLayout->addWidget(new QLabel("Members", this));

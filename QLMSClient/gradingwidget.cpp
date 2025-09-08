@@ -7,6 +7,7 @@
 #include <QLabel>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QSplitter>
 #include <QTableWidget>
 #include <QTextEdit>
 #include <QVBoxLayout>
@@ -37,9 +38,12 @@ void GradingWidget::setupUi()
 
     mainLayout->addLayout(headerLayout);
 
-    // Pending attempts table
-    mainLayout->addWidget(new QLabel("Pending Manual Grading:", this));
+    auto *splitter = new QSplitter(Qt::Vertical, this);
 
+    // Top Panel: Pending attempts table
+    auto *topWidget = new QWidget(this);
+    auto *topLayout = new QVBoxLayout(topWidget);
+    topLayout->addWidget(new QLabel("Pending Manual Grading:", this));
     m_attemptsTable = new QTableWidget(this);
     m_attemptsTable->setColumnCount(9);
     m_attemptsTable->setHorizontalHeaderLabels(QStringList()
@@ -49,9 +53,13 @@ void GradingWidget::setupUi()
     m_attemptsTable->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_attemptsTable->setAlternatingRowColors(true);
     m_attemptsTable->horizontalHeader()->setStretchLastSection(true);
-    mainLayout->addWidget(m_attemptsTable);
+    topLayout->addWidget(m_attemptsTable);
+    splitter->addWidget(topWidget);
 
-    // Score info group
+    // Bottom Panel: Score info and grading controls
+    auto *bottomWidget = new QWidget(this);
+    auto *bottomLayout = new QVBoxLayout(bottomWidget);
+
     auto *scoreInfoGroup = new QGroupBox("Scoring Information", this);
     auto *scoreInfoLayout = new QVBoxLayout(scoreInfoGroup);
 
@@ -62,10 +70,8 @@ void GradingWidget::setupUi()
     m_questionAnswerTextEdit = new QTextEdit(this);
     m_questionAnswerTextEdit->setReadOnly(true);
     scoreInfoLayout->addWidget(m_questionAnswerTextEdit);
+    bottomLayout->addWidget(scoreInfoGroup);
 
-    mainLayout->addWidget(scoreInfoGroup);
-
-    // Grading controls
     auto *gradingGroup = new QGroupBox("Submit Manual Grade", this);
     auto *gradingLayout = new QHBoxLayout(gradingGroup);
 
@@ -83,9 +89,10 @@ void GradingWidget::setupUi()
     gradingLayout->addWidget(m_submitGradeButton);
 
     gradingLayout->addStretch();
+    bottomLayout->addWidget(gradingGroup);
+    splitter->addWidget(bottomWidget);
 
-    mainLayout->addWidget(gradingGroup);
-    mainLayout->addStretch();
+    mainLayout->addWidget(splitter);
 
     // Connect signals
     connect(m_refreshButton, &QPushButton::clicked, this, &GradingWidget::onRefreshPendingAttempts);
