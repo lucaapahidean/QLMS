@@ -27,7 +27,7 @@ private slots:
 private:
     void setupUi();
     void populateAttemptsTable(const QJsonArray &attempts);
-    void updateScoreInfo();
+    void updateScoreInfo(int row);
 
     QTableWidget *m_attemptsTable;
     QPushButton *m_refreshButton;

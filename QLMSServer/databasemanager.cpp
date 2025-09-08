@@ -1114,8 +1114,7 @@ QJsonArray DatabaseManager::getPendingAttempts(int instructorId)
 
     while (query.next()) {
         QJsonObject obj;
-        int attemptId = query.value("attempt_id").toInt();
-        obj["attempt_id"] = attemptId;
+        obj["attempt_id"] = query.value("attempt_id").toInt();
         obj["quiz_id"] = query.value("quiz_id").toInt();
         obj["student_id"] = query.value("student_id").toInt();
         obj["attempt_number"] = query.value("attempt_number").toInt();
@@ -1127,31 +1126,28 @@ QJsonArray DatabaseManager::getPendingAttempts(int instructorId)
         obj["total_auto_points"] = query.value("total_auto_points").toInt();
         obj["total_manual_points"] = query.value("total_manual_points").toInt();
 
-        QJsonArray questionsArray;
         QSqlQuery questionsQuery(db);
-        questionsQuery.prepare(
-            "SELECT q.prompt, a.student_response FROM answers a "
-            "JOIN questions q ON a.question_id = q.question_id "
-            "WHERE a.attempt_id = :attempt_id AND q.question_type = 'open_answer'");
-        questionsQuery.bindValue(":attempt_id", attemptId);
+        questionsQuery.prepare("SELECT q.question_id, q.prompt, a.student_response FROM answers a "
+                               "JOIN questions q ON a.question_id = q.question_id "
+                               "WHERE a.attempt_id = :attempt_id AND q.question_type = "
+                               "'open_answer' AND a.points_earned IS NULL");
+        questionsQuery.bindValue(":attempt_id", obj["attempt_id"].toInt());
 
         if (questionsQuery.exec()) {
             while (questionsQuery.next()) {
-                QJsonObject qObj;
-                qObj["prompt"] = questionsQuery.value("prompt").toString();
-                qObj["student_response"] = questionsQuery.value("student_response").toString();
-                questionsArray.append(qObj);
+                QJsonObject questionObj = obj; // Copy attempt data
+                questionObj["question_id"] = questionsQuery.value("question_id").toInt();
+                questionObj["prompt"] = questionsQuery.value("prompt").toString();
+                questionObj["student_response"] = questionsQuery.value("student_response").toString();
+                attempts.append(questionObj);
             }
         }
-        obj["questions"] = questionsArray;
-
-        attempts.append(obj);
     }
 
     return attempts;
 }
 
-bool DatabaseManager::submitGrade(int attemptId, float manualScore)
+bool DatabaseManager::submitGrade(int attemptId, int questionId, float score)
 {
     QMutexLocker locker(&m_mutex);
     QSqlDatabase db = getDatabase();
@@ -1160,6 +1156,41 @@ bool DatabaseManager::submitGrade(int attemptId, float manualScore)
 
     db.transaction();
 
+    // Update points_earned for the specific open answer question
+    QSqlQuery updateAnswerQuery(db);
+    updateAnswerQuery.prepare("UPDATE answers SET points_earned = :points "
+                              "WHERE attempt_id = :attempt_id AND question_id = :question_id");
+    updateAnswerQuery.bindValue(":points", score / 100.0);
+    updateAnswerQuery.bindValue(":attempt_id", attemptId);
+    updateAnswerQuery.bindValue(":question_id", questionId);
+
+    if (!updateAnswerQuery.exec()) {
+        db.rollback();
+        return false;
+    }
+
+    // Check if there are any other ungraded open questions for this attempt
+    QSqlQuery checkPendingQuery(db);
+    checkPendingQuery.prepare("SELECT COUNT(*) FROM answers a "
+                              "JOIN questions q ON a.question_id = q.question_id "
+                              "WHERE a.attempt_id = :attempt_id "
+                              "AND q.question_type = 'open_answer' "
+                              "AND a.points_earned IS NULL");
+    checkPendingQuery.bindValue(":attempt_id", attemptId);
+
+    if (!checkPendingQuery.exec() || !checkPendingQuery.next()) {
+        db.rollback();
+        return false;
+    }
+
+    int pendingCount = checkPendingQuery.value(0).toInt();
+    if (pendingCount > 0) {
+        // Still pending questions, just commit the grade for the current question
+        db.commit();
+        return true;
+    }
+
+    // All open questions are graded, so calculate final score and update status
     // Get current auto score and point totals
     QSqlQuery query(db);
     query.prepare("SELECT auto_score, total_auto_points, total_manual_points "
@@ -1174,6 +1205,19 @@ bool DatabaseManager::submitGrade(int attemptId, float manualScore)
     float autoScore = query.value("auto_score").toDouble();
     int totalAutoPoints = query.value("total_auto_points").toInt();
     int totalManualPoints = query.value("total_manual_points").toInt();
+
+    // Recalculate manual score
+    query.prepare("SELECT SUM(points_earned) FROM answers WHERE attempt_id = :id AND question_id "
+                  "IN (SELECT question_id FROM questions WHERE question_type = 'open_answer')");
+    query.bindValue(":id", attemptId);
+    float totalManualPointsEarned = 0;
+    if (query.exec() && query.next()) {
+        totalManualPointsEarned = query.value(0).toFloat();
+    }
+
+    float manualScore = (totalManualPoints > 0)
+                            ? (totalManualPointsEarned / totalManualPoints) * 100.0f
+                            : 0.0f;
 
     // Calculate weighted final score
     float finalScore;
@@ -1198,15 +1242,6 @@ bool DatabaseManager::submitGrade(int attemptId, float manualScore)
         db.rollback();
         return false;
     }
-
-    // Update points_earned for open answer questions
-    query.prepare(
-        "UPDATE answers SET points_earned = :points "
-        "WHERE attempt_id = :attempt_id AND question_id IN (SELECT question_id FROM questions "
-        "WHERE question_type = 'open_answer')");
-    query.bindValue(":points", manualScore / 100.0);
-    query.bindValue(":attempt_id", attemptId);
-    query.exec();
 
     db.commit();
     return true;

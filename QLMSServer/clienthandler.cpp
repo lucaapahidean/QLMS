@@ -821,9 +821,10 @@ void ClientHandler::handleSubmitGrade(const QJsonObject &data)
     }
 
     int attemptId = data["attempt_id"].toInt();
+    int questionId = data["question_id"].toInt();
     float score = data["score"].toDouble();
 
-    bool success = DatabaseManager::instance().submitGrade(attemptId, score);
+    bool success = DatabaseManager::instance().submitGrade(attemptId, questionId, score);
 
     QJsonObject response;
     if (success) {

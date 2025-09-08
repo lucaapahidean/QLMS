@@ -35,7 +35,7 @@ public:
 
     // Class operations
     QJsonArray getAllClasses();
-    QJsonArray getClassesForUser(int userId); // New function
+    QJsonArray getClassesForUser(int userId);
     bool createClass(const QString &className);
     bool deleteClass(int classId);
     bool assignUserToClass(int userId, int classId);
@@ -61,7 +61,7 @@ public:
     QJsonObject autoGradeQuizAttempt(int attemptId);
     bool finalizeAttempt(int attemptId, const QString &status, float score = -1);
     QJsonArray getPendingAttempts(int instructorId);
-    bool submitGrade(int attemptId, float manualScore);
+    bool submitGrade(int attemptId, int questionId, float score);
     int getAttemptCount(int quizId, int studentId);
     QJsonArray getStudentQuizAttempts(int studentId);
     QJsonObject getQuizAttemptDetails(int attemptId, int studentId = -1);

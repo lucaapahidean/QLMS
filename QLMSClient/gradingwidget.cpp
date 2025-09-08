@@ -45,16 +45,16 @@ void GradingWidget::setupUi()
     auto *topLayout = new QVBoxLayout(topWidget);
     topLayout->addWidget(new QLabel("Pending Manual Grading:", this));
     m_attemptsTable = new QTableWidget(this);
-    m_attemptsTable->setColumnCount(9);
-    m_attemptsTable->setHorizontalHeaderLabels(QStringList()
-                                               << "Attempt ID" << "Student" << "Quiz Title"
-                                               << "Course" << "Class" << "Attempt #"
-                                               << "Auto Score" << "Open Questions" << "Status");
+    m_attemptsTable->setColumnCount(10);
+    m_attemptsTable->setHorizontalHeaderLabels(
+        QStringList() << "Attempt ID" << "Question ID" << "Student" << "Quiz Title"
+                      << "Course" << "Class" << "Attempt #"
+                      << "Auto Score" << "Question #" << "Status");
     m_attemptsTable->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_attemptsTable->setAlternatingRowColors(true);
 
     for (int i = 0; i < m_attemptsTable->columnCount(); ++i) {
-        if (i == 7) { // "Open Questions" column
+        if (i == 8) { // "Question #" column
             m_attemptsTable->horizontalHeader()->setSectionResizeMode(i, QHeaderView::Stretch);
         } else {
             m_attemptsTable->horizontalHeader()->setSectionResizeMode(i,
@@ -63,7 +63,8 @@ void GradingWidget::setupUi()
     }
 
     m_attemptsTable->setColumnHidden(0, true); // Attempt ID
-    m_attemptsTable->setColumnHidden(8, true); // Status
+    m_attemptsTable->setColumnHidden(1, true); // Question ID
+    m_attemptsTable->setColumnHidden(9, true); // Status
     topLayout->addWidget(m_attemptsTable);
     splitter->addWidget(topWidget);
 
@@ -113,7 +114,7 @@ void GradingWidget::setupUi()
         m_submitGradeButton->setEnabled(hasSelection);
 
         if (hasSelection) {
-            updateScoreInfo();
+            updateScoreInfo(m_attemptsTable->currentRow());
         } else {
             m_scoreInfoLabel->clear();
             m_questionAnswerTextEdit->clear();
@@ -121,44 +122,36 @@ void GradingWidget::setupUi()
     });
 }
 
-void GradingWidget::updateScoreInfo()
+void GradingWidget::updateScoreInfo(int row)
 {
-    int row = m_attemptsTable->currentRow();
     if (row < 0)
         return;
 
     QJsonObject attempt = m_pendingAttempts[row].toObject();
-    QString studentName = m_attemptsTable->item(row, 1)->text();
-    QString quizTitle = m_attemptsTable->item(row, 2)->text();
-    QString courseName = m_attemptsTable->item(row, 3)->text();
-    QString className = m_attemptsTable->item(row, 4)->text();
-    QString autoScore = m_attemptsTable->item(row, 6)->text();
-    QString openQuestions = m_attemptsTable->item(row, 7)->text();
+    QString studentName = attempt["student_name"].toString();
+    QString quizTitle = attempt["quiz_title"].toString();
+    QString courseName = attempt["course_name"].toString();
+    QString className = attempt["class_name"].toString();
+    QString autoScore = QString::number(attempt["auto_score"].toDouble(), 'f', 1) + "%";
+    int questionNumber = row + 1;
 
-    QString info = QString("Student: %1\n"
-                           "Quiz: %2\n"
-                           "Course: %3\n"
-                           "Class: %4\n"
-                           "Auto-graded score: %5\n"
-                           "Number of open answer questions: %6\n\n"
-                           "Enter the manual score for the open answer questions. "
-                           "The final grade will be calculated as a weighted average.")
+    QString info = QString("Grading Question %1 for %2\n"
+                           "Quiz: %3\n"
+                           "Course: %4\n"
+                           "Class: %5\n"
+                           "Auto-graded score for this attempt: %6\n\n"
+                           "Enter the score for this question.")
+                       .arg(questionNumber)
                        .arg(studentName)
                        .arg(quizTitle)
                        .arg(courseName)
                        .arg(className)
-                       .arg(autoScore)
-                       .arg(openQuestions);
+                       .arg(autoScore);
 
     m_scoreInfoLabel->setText(info);
 
-    QJsonArray questions = attempt["questions"].toArray();
-    QString qaText;
-    for (const QJsonValue &value : questions) {
-        QJsonObject question = value.toObject();
-        qaText += "Question:\n" + question["prompt"].toString() + "\n\n";
-        qaText += "Student's Answer:\n" + question["student_response"].toString() + "\n\n";
-    }
+    QString qaText = "Question:\n" + attempt["prompt"].toString() + "\n\n";
+    qaText += "Student's Answer:\n" + attempt["student_response"].toString() + "\n\n";
     m_questionAnswerTextEdit->setPlainText(qaText);
 }
 
@@ -178,24 +171,18 @@ void GradingWidget::onSubmitGrade()
         return;
 
     int attemptId = m_attemptsTable->item(row, 0)->text().toInt();
-    QString studentName = m_attemptsTable->item(row, 1)->text();
-    QString autoScore = m_attemptsTable->item(row, 6)->text();
+    int questionId = m_attemptsTable->item(row, 1)->text().toInt();
 
     int ret = QMessageBox::question(this,
                                     "Submit Grade",
-                                    QString(
-                                        "Submit manual grade of %1% for open answer questions?\n\n"
-                                        "Student: %2\n"
-                                        "Auto-graded score: %3\n"
-                                        "The final grade will be calculated automatically.")
-                                        .arg(QString::number(m_scoreSpinBox->value(), 'f', 2))
-                                        .arg(studentName)
-                                        .arg(autoScore),
+                                    QString("Submit grade of %1% for this question?")
+                                        .arg(QString::number(m_scoreSpinBox->value(), 'f', 2)),
                                     QMessageBox::Yes | QMessageBox::No);
 
     if (ret == QMessageBox::Yes) {
         QJsonObject data;
         data["attempt_id"] = attemptId;
+        data["question_id"] = questionId;
         data["score"] = m_scoreSpinBox->value();
 
         NetworkManager::instance()
@@ -226,6 +213,7 @@ void GradingWidget::populateAttemptsTable(const QJsonArray &attempts)
 {
     m_attemptsTable->setRowCount(0);
 
+    int questionCounter = 0;
     for (const QJsonValue &value : attempts) {
         QJsonObject attempt = value.toObject();
         int row = m_attemptsTable->rowCount();
@@ -233,25 +221,26 @@ void GradingWidget::populateAttemptsTable(const QJsonArray &attempts)
 
         m_attemptsTable
             ->setItem(row, 0, new QTableWidgetItem(QString::number(attempt["attempt_id"].toInt())));
-        m_attemptsTable->setItem(row, 1, new QTableWidgetItem(attempt["student_name"].toString()));
-        m_attemptsTable->setItem(row, 2, new QTableWidgetItem(attempt["quiz_title"].toString()));
-        m_attemptsTable->setItem(row, 3, new QTableWidgetItem(attempt["course_name"].toString()));
-        m_attemptsTable->setItem(row, 4, new QTableWidgetItem(attempt["class_name"].toString()));
         m_attemptsTable->setItem(row,
-                                 5,
+                                 1,
+                                 new QTableWidgetItem(
+                                     QString::number(attempt["question_id"].toInt())));
+        m_attemptsTable->setItem(row, 2, new QTableWidgetItem(attempt["student_name"].toString()));
+        m_attemptsTable->setItem(row, 3, new QTableWidgetItem(attempt["quiz_title"].toString()));
+        m_attemptsTable->setItem(row, 4, new QTableWidgetItem(attempt["course_name"].toString()));
+        m_attemptsTable->setItem(row, 5, new QTableWidgetItem(attempt["class_name"].toString()));
+        m_attemptsTable->setItem(row,
+                                 6,
                                  new QTableWidgetItem(
                                      QString::number(attempt["attempt_number"].toInt())));
 
         // Show auto score
         double autoScore = attempt["auto_score"].toDouble();
         m_attemptsTable->setItem(row,
-                                 6,
+                                 7,
                                  new QTableWidgetItem(QString("%1%").arg(autoScore, 0, 'f', 1)));
 
-        // Show number of open questions
-        int manualQuestions = attempt["total_manual_points"].toInt();
-        m_attemptsTable->setItem(row, 7, new QTableWidgetItem(QString::number(manualQuestions)));
-
-        m_attemptsTable->setItem(row, 8, new QTableWidgetItem("Pending"));
+        m_attemptsTable->setItem(row, 8, new QTableWidgetItem(QString::number(++questionCounter)));
+        m_attemptsTable->setItem(row, 9, new QTableWidgetItem("Pending"));
     }
 }

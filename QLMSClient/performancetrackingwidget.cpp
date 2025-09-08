@@ -294,7 +294,13 @@ void PerformanceTrackingWidget::displayAttemptDetails(const QJsonObject &attempt
                 }
 
             } else if (answer["question_type"].toString() == "open_answer") {
-                detailsText += "Result: Manually Graded\n";
+                if (attemptData["status"].toString() == "completed"
+                    && !answer["points_earned"].isNull()) {
+                    detailsText += QString("Score: %1%\n")
+                                       .arg(answer["points_earned"].toDouble() * 100, 0, 'f', 2);
+                } else {
+                    detailsText += "Result: Pending manual grading\n";
+                }
             }
             detailsText += "\n";
         }
