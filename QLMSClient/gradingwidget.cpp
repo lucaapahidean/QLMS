@@ -52,7 +52,18 @@ void GradingWidget::setupUi()
                                                << "Auto Score" << "Open Questions" << "Status");
     m_attemptsTable->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_attemptsTable->setAlternatingRowColors(true);
-    m_attemptsTable->horizontalHeader()->setStretchLastSection(true);
+
+    for (int i = 0; i < m_attemptsTable->columnCount(); ++i) {
+        if (i == 7) { // "Open Questions" column
+            m_attemptsTable->horizontalHeader()->setSectionResizeMode(i, QHeaderView::Stretch);
+        } else {
+            m_attemptsTable->horizontalHeader()->setSectionResizeMode(i,
+                                                                      QHeaderView::ResizeToContents);
+        }
+    }
+
+    m_attemptsTable->setColumnHidden(0, true); // Attempt ID
+    m_attemptsTable->setColumnHidden(8, true); // Status
     topLayout->addWidget(m_attemptsTable);
     splitter->addWidget(topWidget);
 
@@ -243,6 +254,4 @@ void GradingWidget::populateAttemptsTable(const QJsonArray &attempts)
 
         m_attemptsTable->setItem(row, 8, new QTableWidgetItem("Pending"));
     }
-
-    m_attemptsTable->resizeColumnsToContents();
 }
