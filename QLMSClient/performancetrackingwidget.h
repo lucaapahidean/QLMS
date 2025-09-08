@@ -35,7 +35,7 @@ private:
     void setupUi();
     void displayAttemptDetails(const QJsonObject &attemptData);
     void clearDetailsArea();
-    bool applyFilterRecursive(QTreeWidgetItem *item, const QString &text);
+    bool applyFilterRecursive(QTreeWidgetItem *item, const QString &text, const QString &filterBy);
 
     int m_instructorId;
 

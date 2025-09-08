@@ -310,20 +310,31 @@ void PerformanceTrackingWidget::clearDetailsArea()
 void PerformanceTrackingWidget::applyFilter()
 {
     for (int i = 0; i < m_treeWidget->topLevelItemCount(); ++i) {
-        applyFilterRecursive(m_treeWidget->topLevelItem(i), m_filterWidget->filterText());
+        applyFilterRecursive(m_treeWidget->topLevelItem(i),
+                             m_filterWidget->filterText(),
+                             m_filterWidget->currentFilterOption());
     }
 }
 
-bool PerformanceTrackingWidget::applyFilterRecursive(QTreeWidgetItem *item, const QString &text)
+bool PerformanceTrackingWidget::applyFilterRecursive(QTreeWidgetItem *item,
+                                                     const QString &text,
+                                                     const QString &filterBy)
 {
     bool anyChildMatches = false;
     for (int i = 0; i < item->childCount(); ++i) {
-        if (applyFilterRecursive(item->child(i), text)) {
+        if (applyFilterRecursive(item->child(i), text, filterBy)) {
             anyChildMatches = true;
         }
     }
 
-    bool selfMatches = item->text(0).contains(text, Qt::CaseInsensitive);
+    bool selfMatches = false;
+    QString itemType = item->text(1); // Type is in column 1
+    if ((filterBy == "Student" && itemType == "attempt")
+        || (filterBy == "Quiz" && itemType == "quiz")
+        || (filterBy == "Course" && itemType == "course")) {
+        selfMatches = item->text(0).contains(text, Qt::CaseInsensitive);
+    }
+
     bool shouldBeVisible = selfMatches || anyChildMatches;
     item->setHidden(!shouldBeVisible);
 
