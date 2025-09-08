@@ -29,7 +29,7 @@ private slots:
 private:
     void setupUi();
     void setConnectionState(bool connected);
-    void updateConnectionState(); // New method to check current state
+    void updateConnectionState();
 
     QLineEdit *m_serverEdit;
     QLineEdit *m_portEdit;

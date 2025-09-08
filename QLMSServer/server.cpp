@@ -78,13 +78,13 @@ Server::Server(QObject *parent)
                 for (const QSslError &error : errors) {
                     qWarning() << "  -" << error.errorString();
                 }
-                // Accept self-signed certificates for development
+                // Accept self-signed certificates
                 if (socket) {
                     socket->ignoreSslErrors();
                 }
             });
 
-    // Connect to handle new connections - use pendingConnectionAvailable like in the Qt example
+    // Connect to handle new connections
     connect(m_tcpServer, &QSslServer::pendingConnectionAvailable, this, &Server::onNewConnection);
 }
 
