@@ -65,6 +65,9 @@ public:
     int getAttemptCount(int quizId, int studentId);
     QJsonArray getStudentQuizAttempts(int studentId);
     QJsonObject getQuizAttemptDetails(int attemptId, int studentId = -1);
+    QJsonArray getStudentAttemptsForQuiz(int quizId);
+    QJsonObject getClassStatistics(int classId);
+    QJsonObject getCourseStatistics(int courseId);
 
 private:
     DatabaseManager();

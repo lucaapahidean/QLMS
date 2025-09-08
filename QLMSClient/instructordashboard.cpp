@@ -1,6 +1,7 @@
 #include "instructordashboard.h"
 #include "coursemanagementwidget.h"
 #include "gradingwidget.h"
+#include "performancetrackingwidget.h"
 #include <QTabWidget>
 
 InstructorDashboard::InstructorDashboard(const QString &username, int userId, QWidget *parent)
@@ -15,6 +16,9 @@ InstructorDashboard::InstructorDashboard(const QString &username, int userId, QW
 
     auto *gradingWidget = new GradingWidget(this);
     tabWidget->addTab(gradingWidget, "Grading");
+
+    auto *performanceWidget = new PerformanceTrackingWidget(userId, this);
+    tabWidget->addTab(performanceWidget, "Track Performance");
 
     setCentralWorkspace(tabWidget);
 }

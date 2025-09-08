@@ -55,9 +55,12 @@ private:
     void handleStartQuiz(const QJsonObject &data);
     void handleFinishAttempt(const QJsonObject &data);
     void handleGetPendingAttempts();
-    void handleSubmitGrade(const QJsonObject &data);
     void handleGetMyAttempts();
     void handleGetAttemptDetails(const QJsonObject &data);
+    void handleGetStudentAttemptsForQuiz(const QJsonObject &data);
+    void handleSubmitGrade(const QJsonObject &data);
+    void handleGetClassStatistics(const QJsonObject &data);
+    void handleGetCourseStatistics(const QJsonObject &data);
 
     QSslSocket *m_socket;
     QByteArray m_buffer;

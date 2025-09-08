@@ -128,6 +128,12 @@ void ClientHandler::processMessage(const QJsonObject &message)
         handleGetAttemptDetails(data);
     } else if (command == "GET_PENDING_ATTEMPTS") {
         handleGetPendingAttempts();
+    } else if (command == "GET_STUDENT_ATTEMPTS_FOR_QUIZ") {
+        handleGetStudentAttemptsForQuiz(data);
+    } else if (command == "GET_CLASS_STATISTICS") {
+        handleGetClassStatistics(data);
+    } else if (command == "GET_COURSE_STATISTICS") {
+        handleGetCourseStatistics(data);
     } else if (command == "SUBMIT_GRADE") {
         handleSubmitGrade(data);
     } else {
@@ -744,6 +750,63 @@ void ClientHandler::handleGetPendingAttempts()
     QJsonObject response;
     response["type"] = "DATA_RESPONSE";
     response["data"] = attempts;
+    sendResponse(response);
+}
+
+void ClientHandler::handleGetStudentAttemptsForQuiz(const QJsonObject &data)
+{
+    if (!m_currentUser || m_currentUser->getRole() != "instructor") {
+        QJsonObject response;
+        response["type"] = "ERROR";
+        response["message"] = "Unauthorized";
+        sendResponse(response);
+        return;
+    }
+
+    int quizId = data["quiz_id"].toInt();
+    QJsonArray attempts = DatabaseManager::instance().getStudentAttemptsForQuiz(quizId);
+
+    QJsonObject response;
+    response["type"] = "DATA_RESPONSE";
+    response["data"] = attempts;
+    sendResponse(response);
+}
+
+void ClientHandler::handleGetClassStatistics(const QJsonObject &data)
+{
+    if (!m_currentUser || m_currentUser->getRole() != "instructor") {
+        QJsonObject response;
+        response["type"] = "ERROR";
+        response["message"] = "Unauthorized";
+        sendResponse(response);
+        return;
+    }
+
+    int classId = data["class_id"].toInt();
+    QJsonObject stats = DatabaseManager::instance().getClassStatistics(classId);
+
+    QJsonObject response;
+    response["type"] = "DATA_RESPONSE";
+    response["data"] = stats;
+    sendResponse(response);
+}
+
+void ClientHandler::handleGetCourseStatistics(const QJsonObject &data)
+{
+    if (!m_currentUser || m_currentUser->getRole() != "instructor") {
+        QJsonObject response;
+        response["type"] = "ERROR";
+        response["message"] = "Unauthorized";
+        sendResponse(response);
+        return;
+    }
+
+    int courseId = data["course_id"].toInt();
+    QJsonObject stats = DatabaseManager::instance().getCourseStatistics(courseId);
+
+    QJsonObject response;
+    response["type"] = "DATA_RESPONSE";
+    response["data"] = stats;
     sendResponse(response);
 }
 

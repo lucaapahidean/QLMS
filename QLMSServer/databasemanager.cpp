@@ -1231,3 +1231,102 @@ int DatabaseManager::getAttemptCount(int quizId, int studentId)
 
     return query.value(0).toInt();
 }
+
+QJsonArray DatabaseManager::getStudentAttemptsForQuiz(int quizId)
+{
+    QJsonArray attempts;
+    QMutexLocker locker(&m_mutex);
+    QSqlDatabase db = getDatabase();
+    if (!db.open())
+        return attempts;
+
+    QSqlQuery query(db);
+    query.prepare(
+        "SELECT qa.attempt_id, qa.attempt_number, qa.final_score, u.username as student_name "
+        "FROM quiz_attempts qa "
+        "JOIN users u ON qa.student_id = u.user_id "
+        "WHERE qa.quiz_id = :quiz_id "
+        "ORDER BY u.username, qa.attempt_number");
+    query.bindValue(":quiz_id", quizId);
+
+    if (!query.exec()) {
+        qWarning() << "Failed to get student attempts for quiz:" << query.lastError().text();
+        return attempts;
+    }
+
+    while (query.next()) {
+        QJsonObject obj;
+        obj["attempt_id"] = query.value("attempt_id").toInt();
+        obj["attempt_number"] = query.value("attempt_number").toInt();
+        obj["final_score"] = query.value("final_score").toDouble();
+        obj["student_name"] = query.value("student_name").toString();
+        attempts.append(obj);
+    }
+
+    return attempts;
+}
+
+QJsonObject DatabaseManager::getClassStatistics(int classId)
+{
+    QJsonObject stats;
+    QMutexLocker locker(&m_mutex);
+    QSqlDatabase db = getDatabase();
+    if (!db.open())
+        return stats;
+
+    QSqlQuery query(db);
+
+    // Get student count
+    query.prepare("SELECT COUNT(user_id) FROM class_members WHERE class_id = :class_id AND user_id "
+                  "IN (SELECT user_id FROM users WHERE role = 'student')");
+    query.bindValue(":class_id", classId);
+    if (query.exec() && query.next()) {
+        stats["student_count"] = query.value(0).toInt();
+    }
+
+    // Get average score
+    query.prepare("SELECT AVG(qa.final_score) "
+                  "FROM quiz_attempts qa "
+                  "JOIN users u ON qa.student_id = u.user_id "
+                  "JOIN class_members cm ON u.user_id = cm.user_id "
+                  "WHERE cm.class_id = :class_id AND qa.final_score IS NOT NULL");
+    query.bindValue(":class_id", classId);
+    if (query.exec() && query.next()) {
+        stats["average_score"] = query.value(0).toDouble();
+    }
+
+    return stats;
+}
+
+QJsonObject DatabaseManager::getCourseStatistics(int courseId)
+{
+    QJsonObject stats;
+    QMutexLocker locker(&m_mutex);
+    QSqlDatabase db = getDatabase();
+    if (!db.open())
+        return stats;
+
+    QSqlQuery query(db);
+
+    // Get student count (students who have at least one attempt in this course)
+    query.prepare("SELECT COUNT(DISTINCT qa.student_id) "
+                  "FROM quiz_attempts qa "
+                  "JOIN course_materials cm ON qa.quiz_id = cm.material_id "
+                  "WHERE cm.course_id = :course_id");
+    query.bindValue(":course_id", courseId);
+    if (query.exec() && query.next()) {
+        stats["student_count"] = query.value(0).toInt();
+    }
+
+    // Get average score
+    query.prepare("SELECT AVG(qa.final_score) "
+                  "FROM quiz_attempts qa "
+                  "JOIN course_materials cm ON qa.quiz_id = cm.material_id "
+                  "WHERE cm.course_id = :course_id AND qa.final_score IS NOT NULL");
+    query.bindValue(":course_id", courseId);
+    if (query.exec() && query.next()) {
+        stats["average_score"] = query.value(0).toDouble();
+    }
+
+    return stats;
+}
